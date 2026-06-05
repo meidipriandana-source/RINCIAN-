@@ -1439,11 +1439,11 @@ export default function App() {
       doc.setTextColor(50, 60, 70);
       doc.text("No", 17, y + 5);
       doc.text("Kode Rekening", 23, y + 5);
-      doc.text("Nama Kategori Program Belanja", 55, y + 5);
-      doc.text("Pagu Rencana (IDR)", 114, y + 5);
-      doc.text("Total Realisasi (IDR)", 141, y + 5);
-      doc.text("Sisa Anggaran (IDR)", 168, y + 5);
-      doc.text("Abs (%)", 188, y + 5);
+      doc.text("Nama Kategori Program Belanja", 53, y + 5);
+      doc.text("Pagu Rencana (IDR)", 104, y + 5);
+      doc.text("Total Realisasi (IDR)", 130, y + 5);
+      doc.text("Sisa Anggaran (IDR)", 156, y + 5);
+      doc.text("Abs (%)", 185, y + 5);
       y += 7;
 
       let idxSum = 1;
@@ -1470,13 +1470,13 @@ export default function App() {
 
         doc.text(idxSum.toString(), 17, y + 5);
         doc.text(cat.kode, 23, y + 5);
-        doc.text(shortenedName, 55, y + 5);
-        doc.text(catRencana.toLocaleString("id-ID"), 114, y + 5);
-        doc.text(catSpent.toLocaleString("id-ID"), 141, y + 5);
-        doc.text(catSisa.toLocaleString("id-ID"), 168, y + 5);
+        doc.text(shortenedName, 53, y + 5);
+        doc.text(catRencana.toLocaleString("id-ID"), 104, y + 5);
+        doc.text(catSpent.toLocaleString("id-ID"), 130, y + 5);
+        doc.text(catSisa.toLocaleString("id-ID"), 156, y + 5);
         
         doc.setFont("helvetica", "bold");
-        doc.text(`${catPct.toFixed(1)}%`, 188, y + 5);
+        doc.text(`${catPct.toFixed(1)}%`, 185, y + 5);
         doc.setFont("helvetica", "normal");
 
         // Separator inside sum table
@@ -1499,11 +1499,11 @@ export default function App() {
       doc.setTextColor(PRIMARY_COLOR[0], PRIMARY_COLOR[1], PRIMARY_COLOR[2]);
       doc.text("TOTAL ESTIMASI TAHUNAN", 23, y + 5);
       
-      doc.text(totalRencanaYear.toLocaleString("id-ID"), 114, y + 5);
-      doc.text(totalSpentYear.toLocaleString("id-ID"), 141, y + 5);
-      doc.text((totalRencanaYear - totalSpentYear).toLocaleString("id-ID"), 168, y + 5);
+      doc.text(totalRencanaYear.toLocaleString("id-ID"), 104, y + 5);
+      doc.text(totalSpentYear.toLocaleString("id-ID"), 130, y + 5);
+      doc.text((totalRencanaYear - totalSpentYear).toLocaleString("id-ID"), 156, y + 5);
       const totalPctYear = totalRencanaYear > 0 ? (totalSpentYear / totalRencanaYear) * 100 : 0;
-      doc.text(`${totalPctYear.toFixed(1)}%`, 188, y + 5);
+      doc.text(`${totalPctYear.toFixed(1)}%`, 185, y + 5);
       y += 12;
 
       // Legal Signatures Section directly follows on the final page
@@ -1529,7 +1529,7 @@ export default function App() {
       doc.setFont("helvetica", "normal");
       doc.setFontSize(7.5);
       doc.text("Kuasa Pengguna Anggaran (KPA)", 15, y);
-      doc.text("Bendahara Pengeluaran RSUD", 140, y);
+      doc.text("Admin diklat RSUD", 140, y);
 
       y += 18;
       
@@ -1542,7 +1542,7 @@ export default function App() {
       doc.setFont("helvetica", "normal");
       doc.setTextColor(100, 110, 120);
       doc.text("NIP. 19781203 200501 1 002", 15, y);
-      doc.text("NIP. 19890522 201503 1 005", 140, y);
+      doc.text("NRPTT. 01/06/BLUD/drHJSK", 140, y);
 
       const fn = isMonthly ? `LPJ_Realisasi_APBD_Tarakan_Bulan_${bName}_2026.pdf` : `LPJ_Realisasi_APBD_Tarakan_2026.pdf`;
       doc.save(fn);
@@ -1903,7 +1903,7 @@ export default function App() {
       doc.setFont("helvetica", "normal");
       doc.setFontSize(7.5);
       doc.text("Kuasa Pengguna Anggaran (KPA)", 15, y);
-      doc.text("Bendahara Pengeluaran RSUD", 140, y);
+      doc.text("Admin diklat RSUD", 140, y);
 
       y += 18;
 
@@ -1916,7 +1916,7 @@ export default function App() {
       doc.setFont("helvetica", "normal");
       doc.setTextColor(100, 110, 120);
       doc.text("NIP. 19781203 200501 1 002", 15, y);
-      doc.text("NIP. 19890522 201503 1 005", 140, y);
+      doc.text("NRPTT. 01/06/BLUD/drHJSK", 140, y);
 
       const fn = isMonthly ? `Laporan_APBD_Kategori_${cat.id.toUpperCase()}_Bulan_${bName}_2026.pdf` : `Laporan_APBD_Kategori_${cat.id.toUpperCase()}_2026.pdf`;
       doc.save(fn);

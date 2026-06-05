@@ -1,0 +1,6 @@
+{
+  "name": "APBD 2026 Monitoring Dashboard",
+  "description": "Dashboard Monitoring Peningkatan Kompetensi SDM di RSUD dr. H. Jusuf SK dengan anggaran APBD Tahun Periode 2026.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

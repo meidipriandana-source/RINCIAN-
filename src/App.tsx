@@ -96,6 +96,8 @@ export default function App() {
     }
   });
 
+  const [highlightedTxId, setHighlightedTxId] = useState<string | null>(null);
+
   // --- GOOGLE WORKSPACE SYSTEM STATES ---
   const [isGoogleLinked, setIsGoogleLinked] = useState(() => {
     return localStorage.getItem("apbd_2026_google_linked") === "true";
@@ -279,6 +281,12 @@ export default function App() {
     setIsGoogleSyncLoading(true);
     setGoogleSyncError(null);
     try {
+      const token = getCachedToken();
+      if (!token) {
+        setGoogleSyncError("Lakukan login Google sebelum memuat dari Google Sheets.");
+        showToast("Hubungkan dengan Akun Google terlebih dahulu.", "info");
+        return;
+      }
       const data = await loadAllDataFromGoogleSheets();
       if (data.categories && data.categories.length > 0) {
         setCategories(data.categories);
@@ -292,7 +300,7 @@ export default function App() {
         showToast("Spreadsheet baru terdeteksi: Baseline berhasil diupload ke Google Sheets!", "success");
       }
     } catch (err: any) {
-      console.error("Spreadsheet load issue:", err);
+      console.warn("Spreadsheet load issue:", err);
       setGoogleSyncError(err.message || "Failed to load spreadsheet rows.");
       showToast("Data Google Sheets Gagal dimuat. Menggunakan data lokal.", "warn");
     } finally {
@@ -363,7 +371,7 @@ export default function App() {
         await saveAllDataToGoogleSheets(categories, transactions);
         showToast("Perubahan berhasil disimpan ke Google Sheets otomatis!", "success");
       } catch (err: any) {
-        console.error("Auto Sync Google Sheets error:", err);
+        console.warn("Auto Sync Google Sheets error:", err);
         showToast("Gagal menyinkronkan otomatis ke Google Sheets.", "warn");
       } finally {
         setIsGoogleSyncLoading(false);
@@ -906,6 +914,11 @@ export default function App() {
     setTransactions((prev) => [newTx, ...prev]);
     setIsTxModalOpen(false);
 
+    setHighlightedTxId(newTx.id);
+    setTimeout(() => {
+      setHighlightedTxId((prev) => (prev === newTx.id ? null : prev));
+    }, 4000);
+
     // Reset Form Input Fields
     setFormAmount("");
     setFormDescription("");
@@ -951,6 +964,11 @@ export default function App() {
 
       setTransactions((prev) => [newTx, ...prev]);
       setIsTxModalOpen(false);
+
+      setHighlightedTxId(newTx.id);
+      setTimeout(() => {
+        setHighlightedTxId((prev) => (prev === newTx.id ? null : prev));
+      }, 4000);
 
       // Reset Form Input Fields
       setFormAmount("");
@@ -3544,9 +3562,29 @@ export default function App() {
                         }
                       });
 
+                      const isHighlighted = tx.id === highlightedTxId;
+
                       return (
-                        <tr key={tx.id} className={`transition-colors border-b ${isLight ? 'hover:bg-slate-50 border-slate-100' : 'hover:bg-white/[0.02] border-white/[0.01]'}`}>
+                        <tr 
+                          key={tx.id} 
+                          className={`transition-all duration-500 border-b ${
+                            isHighlighted
+                              ? isContrast
+                                ? "bg-amber-400 text-black font-bold ring-2 ring-white/80"
+                                : isLight
+                                  ? "bg-emerald-50 border-emerald-200 text-emerald-950 shadow-inner"
+                                  : "bg-emerald-950/30 border-emerald-800/40 text-emerald-100 shadow-inner"
+                              : isLight 
+                                ? "hover:bg-slate-50 border-slate-100" 
+                                : "hover:bg-white/[0.02] border-white/[0.01]"
+                          }`}
+                        >
                           <td className="p-4 whitespace-nowrap font-mono text-slate-500 text-xs">
+                            {isHighlighted && (
+                              <span className="inline-flex items-center gap-1 text-[8px] font-black uppercase tracking-widest text-[#10b981] bg-emerald-500/10 px-1.5 py-0.5 rounded-md animate-pulse mb-1 block w-max">
+                                BARU
+                              </span>
+                            )}
                             {tx.date} 
                             <span className="text-[10px] text-slate-400 block">Bulan {getMonthName(tx.month)}</span>
                           </td>

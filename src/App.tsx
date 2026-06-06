@@ -11,6 +11,7 @@ import {
   Medal,
   Plus,
   Download,
+  Upload,
   FileBadge,
   CircleAlert,
   TrendingUp,
@@ -106,6 +107,16 @@ export default function App() {
   const [isGoogleSyncLoading, setIsGoogleSyncLoading] = useState(false);
   const [isSheetLoaded, setIsSheetLoaded] = useState(false);
   const [googleSyncError, setGoogleSyncError] = useState<string | null>(null);
+
+  // --- LOCAL BACKUP & RESTORE STATES ---
+  const [isRestoreModalOpen, setIsRestoreModalOpen] = useState(false);
+  const [pendingRestoreData, setPendingRestoreData] = useState<{
+    categories: BudgetCategory[];
+    transactions: RealisasiTransaction[];
+    fileName: string;
+    version?: string;
+    exportedAt?: string;
+  } | null>(null);
 
   useEffect(() => {
     try {
@@ -380,6 +391,81 @@ export default function App() {
 
     return () => clearTimeout(delayDebounce);
   }, [categories, transactions, isGoogleLinked, isSheetLoaded]);
+
+  // --- LOCAL BACKUP & RESTORE UTILITY HANDLERS ---
+  const handleLocalBackup = () => {
+    try {
+      const dataStr = JSON.stringify({ 
+        version: "1.0", 
+        exportedAt: new Date().toISOString(), 
+        categories, 
+        transactions 
+      }, null, 2);
+      const blob = new Blob([dataStr], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const linkElement = document.createElement("a");
+      linkElement.setAttribute("href", url);
+      linkElement.setAttribute("download", `Backup_APBD_RSUD_Jusuf_SK_${new Date().toISOString().split("T")[0]}.json`);
+      linkElement.click();
+      URL.revokeObjectURL(url);
+      showToast("Unduhan berkas cadangan offline (JSON) berhasil!", "success");
+    } catch (e: any) {
+      console.warn("Local backup export error:", e);
+      showToast("Gagal mengunduh berkas cadangan lokal.", "warn");
+    }
+  };
+
+  const handleLocalRestore = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const fileReader = new FileReader();
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    fileReader.onload = (event) => {
+      try {
+        const parsed = JSON.parse(event.target?.result as string);
+        if (parsed && Array.isArray(parsed.categories) && Array.isArray(parsed.transactions)) {
+          // Perform basic schema validation
+          const isValidCategories = parsed.categories.every((c: any) => c && typeof c.id === "string" && typeof c.nama === "string");
+          const isValidTransactions = parsed.transactions.every((t: any) => t && typeof t.id === "string" && typeof t.amount === "number");
+
+          if (!isValidCategories || !isValidTransactions) {
+            showToast("Berkas cadangan tidak kompatibel dengan skema APBD RSUD.", "warn");
+            return;
+          }
+
+          setPendingRestoreData({
+            categories: parsed.categories,
+            transactions: parsed.transactions,
+            fileName: file.name,
+            version: parsed.version,
+            exportedAt: parsed.exportedAt,
+          });
+          setIsRestoreModalOpen(true);
+        } else {
+          showToast("Format berkas cadangan tidak valid (Array categories/transactions kosong).", "warn");
+        }
+      } catch (err) {
+        showToast("Format dokumen bukan merupakan format JSON yang valid.", "warn");
+      }
+    };
+    fileReader.readAsText(file);
+    // Reset file input value so user can upload the same file again if they desire
+    e.target.value = "";
+  };
+
+  const handleConfirmRestore = () => {
+    if (!pendingRestoreData) return;
+    setCategories(pendingRestoreData.categories);
+    setTransactions(pendingRestoreData.transactions);
+    
+    // Core persistence
+    localStorage.setItem("apbd_2026_categories", JSON.stringify(pendingRestoreData.categories));
+    localStorage.setItem("apbd_2026_transactions", JSON.stringify(pendingRestoreData.transactions));
+
+    setIsRestoreModalOpen(false);
+    setPendingRestoreData(null);
+    showToast("Database APBD berhasil dipulihkan dari berkas cadangan!", "success");
+  };
 
   // --- THEME-BASED DYNAMIC STYLING CONFIGURATIONS ---
   const isDark = theme === "dark";
@@ -2170,6 +2256,55 @@ export default function App() {
                   <span>OTORISASI GOOGLE CLOUD SYNC</span>
                 </button>
               )}
+            </div>
+          </div>
+
+          {/* Divider */}
+          <div className="my-5 border-t border-slate-200/20 dark:border-white/5"></div>
+
+          {/* Local Backup & Restore Sub-section */}
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 relative z-10 text-xs text-slate-400">
+            <div className="space-y-1 justify-center">
+              <h3 className={`text-xs font-bold tracking-tight ${themeClasses.textWhite} flex items-center gap-1.5`}>
+                <Database className="text-amber-500 shrink-0" size={14} />
+                <span>Utilitas Backup & Restore Lokal (Format JSON)</span>
+              </h3>
+              <p className="text-[11px] leading-relaxed max-w-xl text-slate-400/90">
+                Amankan draf anggaran dan riwayat rincian belanja offline Anda. Unduh salinan cadangan instan atau pulihkan dari berkas JSON yang pernah diekspor sebelumnya.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              {/* Backup Button */}
+              <button
+                onClick={handleLocalBackup}
+                className={`px-4 py-2 rounded-xl text-[11px] font-bold tracking-wider border flex items-center justify-center gap-2 cursor-pointer transition-all ${
+                  isLight 
+                    ? "bg-amber-50 hover:bg-amber-100 border-amber-200 text-amber-800" 
+                    : "bg-amber-500/10 hover:bg-amber-500/20 border-amber-500/20 text-amber-400"
+                }`}
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>Ekspor Backup (JSON)</span>
+              </button>
+
+              {/* Restore Button */}
+              <label
+                className={`px-4 py-2 rounded-xl text-[11px] font-bold tracking-wider border flex items-center justify-center gap-2 cursor-pointer transition-all ${
+                  isLight 
+                    ? "bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700" 
+                    : "bg-white/5 hover:bg-white/10 border-white/10 text-white"
+                }`}
+              >
+                <Upload className="w-3.5 h-3.5 text-indigo-400" />
+                <span>Impor & Pulihkan</span>
+                <input
+                  type="file"
+                  accept=".json"
+                  onChange={handleLocalRestore}
+                  className="hidden"
+                />
+              </label>
             </div>
           </div>
         </section>
@@ -4111,6 +4246,90 @@ export default function App() {
               >
                 <CheckCircle2 size={13} />
                 <span>Ya, Tetap Simpan</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* --- CONFIRM SYSTEM MODAL: RESTORE LOCAL DATABASE --- */}
+      {isRestoreModalOpen && pendingRestoreData && (
+        <div id="restore_confirmation_modal" className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200">
+          <div className={`w-full max-w-md border rounded-[32px] shadow-2xl p-6 md:p-8 text-left relative animate-in zoom-in-95 duration-200 transition-all ${isLight ? 'bg-white border-slate-200 text-slate-800' : 'bg-[#04060d]/95 border-white/10 text-white'}`}>
+            <button
+              onClick={() => {
+                setIsRestoreModalOpen(false);
+                setPendingRestoreData(null);
+              }}
+              className="absolute top-5 right-5 text-slate-400 hover:text-indigo-650 dark:hover:text-white transition-colors p-1 cursor-pointer"
+            >
+              <X size={18} />
+            </button>
+
+            <header className="mb-6 space-y-2">
+              <div className="w-12 h-12 bg-amber-500/15 text-amber-500 rounded-2xl flex items-center justify-center mb-3">
+                <AlertTriangle size={22} className="animate-pulse" />
+              </div>
+              <h4 className={`text-lg font-bold flex items-center gap-2 ${themeClasses.textWhite}`}>
+                <span>Konfirmasi Pemulihan Data (Restore)</span>
+              </h4>
+              <p className="text-xs text-slate-500 leading-relaxed">
+                Anda akan menimpa seluruh kategori belanja, rencana pagu, dan rincian transaksi belanja saat ini dengan data dari file cadangan. Tindakan ini tidak dapat dibatalkan.
+              </p>
+            </header>
+
+            <div className={`p-4 border rounded-2xl space-y-3 text-xs font-mono mb-4 ${isLight ? 'bg-slate-50 border-slate-200 text-slate-800' : 'bg-white/5 border-white/5 text-slate-300'}`}>
+              <div className="flex justify-between items-center gap-2">
+                <span className="text-slate-550 text-[10px] font-bold uppercase tracking-wider block">Nama Berkas:</span>
+                <span className="font-bold text-amber-600 dark:text-amber-400 truncate max-w-[200px]">{pendingRestoreData.fileName}</span>
+              </div>
+              
+              <div className="h-px bg-slate-200 dark:bg-white/10" />
+
+              <div className="flex justify-between items-center">
+                <span className="text-slate-550 text-[10px] font-bold uppercase tracking-wider block">Kategori Belanja:</span>
+                <span className="font-bold">{pendingRestoreData.categories.length} entri</span>
+              </div>
+
+              <div className="flex justify-between items-center">
+                <span className="text-slate-550 text-[10px] font-bold uppercase tracking-wider block">Mutasi Realisasi:</span>
+                <span className="font-bold">{pendingRestoreData.transactions.length} transaksi</span>
+              </div>
+
+              {pendingRestoreData.exportedAt && (
+                <>
+                  <div className="h-px bg-slate-200 dark:bg-white/10" />
+                  <div className="flex flex-col gap-0.5">
+                    <span className="text-slate-550 text-[10px] font-bold uppercase tracking-wider block">Waktu Cadangan Ekspor:</span>
+                    <span className="font-semibold text-[10.5px] text-indigo-500 font-mono">
+                      {new Date(pendingRestoreData.exportedAt).toLocaleString("id-ID", {
+                        dateStyle: "medium",
+                        timeStyle: "short",
+                      })}
+                    </span>
+                  </div>
+                </>
+              )}
+            </div>
+
+            <div className="pt-2 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsRestoreModalOpen(false);
+                  setPendingRestoreData(null);
+                }}
+                className={`px-5 py-2.5 rounded-xl text-xs font-semibold tracking-wider transition-colors cursor-pointer ${isLight ? 'bg-slate-100 hover:bg-slate-200 text-slate-600' : 'bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white'}`}
+              >
+                Batalkan
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmRestore}
+                className="px-6 py-2.5 bg-amber-600 hover:bg-amber-500 text-white rounded-xl text-xs font-bold tracking-wider shadow-lg shadow-amber-600/15 transition-all cursor-pointer flex items-center gap-2"
+              >
+                <CheckCircle2 size={13} />
+                <span>Ya, Pulihkan Sekarang</span>
               </button>
             </div>
           </div>

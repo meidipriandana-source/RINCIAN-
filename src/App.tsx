@@ -260,7 +260,7 @@ export default function App() {
   // --- THEME STATE ---
   const [themeSetting, setThemeSetting] = useState<"system" | "light" | "dark" | "navy" | "contrast">(() => {
     const saved = localStorage.getItem("apbd_2026_theme_setting");
-    return (saved as "system" | "light" | "dark" | "navy" | "contrast") || "system";
+    return (saved as "system" | "light" | "dark" | "navy" | "contrast") || "navy";
   });
 
   const [systemTheme, setSystemTheme] = useState<"light" | "dark">(() => {

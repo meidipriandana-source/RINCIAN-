@@ -97,35 +97,47 @@ export async function uploadPdfToDrive(file: File): Promise<{ webViewLink: strin
     throw new Error("Anda harus login dengan Google terlebih dahulu untuk mengunggah ke Google Drive.");
   }
 
-  // Step 1: Create file metadata
-  const metadata = {
-    name: file.name,
-    mimeType: "application/pdf",
-    parents: [FOLDER_ID]
+  // Helper function to perform upload
+  const performUpload = async (parents?: string[]) => {
+    const metadata: any = {
+      name: file.name,
+      mimeType: "application/pdf"
+    };
+    if (parents && parents.length > 0) {
+      metadata.parents = parents;
+    }
+
+    const formData = new FormData();
+    formData.append(
+      "metadata",
+      new Blob([JSON.stringify(metadata)], { type: "application/json" })
+    );
+    formData.append("file", file);
+
+    return fetch(
+      `https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`
+        },
+        body: formData
+      }
+    );
   };
 
-  // Step 2: Use multipart upload
-  const formData = new FormData();
-  formData.append(
-    "metadata",
-    new Blob([JSON.stringify(metadata)], { type: "application/json" })
-  );
-  formData.append("file", file);
+  // Try uploading to specific folder first
+  let response = await performUpload([FOLDER_ID]);
 
-  const response = await fetch(
-    `https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`
-      },
-      body: formData
-    }
-  );
+  if (!response.ok) {
+    console.warn(`Gagal mengunggah file ke folder spesifik (${FOLDER_ID}). Mencoba mengunggah ke root Google Drive...`);
+    // Retry without parent folder (defaults to Root of their Drive)
+    response = await performUpload();
+  }
 
   if (!response.ok) {
     const errText = await response.text();
-    console.error("Gagal mengunggah file ke Google Drive:", errText);
+    console.error("Gagal mengunggah file ke Google Drive (Root & Folder):", errText);
     throw new Error(`Upload gagal: ${response.statusText}`);
   }
 

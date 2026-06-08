@@ -69,6 +69,7 @@ import {
   FOLDER_ID,
   SPREADSHEET_ID
 } from "./googleWorkspace";
+import { saveToDB, loadFromDB } from "./indexedDB";
 
 const getCategoryColor = (id: string): string => {
   switch (id) {
@@ -131,12 +132,33 @@ export default function App() {
     exportedAt?: string;
   } | null>(null);
 
+  // Load initial state on app initialization from high-capacity IndexedDB, falling back to localStorage
+  useEffect(() => {
+    const initDatabaseState = async () => {
+      try {
+        const dbCats = await loadFromDB("apbd_2026_categories");
+        const dbTxs = await loadFromDB("apbd_2026_transactions");
+        if (dbCats && dbCats.length > 0) {
+          setCategories(dbCats);
+        }
+        if (dbTxs && dbTxs.length > 0) {
+          setTransactions(dbTxs);
+        }
+      } catch (e) {
+        console.error("Gagal melakukan restorasi startup dari IndexedDB:", e);
+      }
+    };
+    initDatabaseState();
+  }, []);
+
   useEffect(() => {
     try {
       localStorage.setItem("apbd_2026_categories", JSON.stringify(categories));
     } catch (e) {
       console.error("Gagal menyimpan kategori ke local storage:", e);
     }
+    // Always persist to IndexedDB asynchronously
+    saveToDB("apbd_2026_categories", categories);
   }, [categories]);
 
   // Sync state with verified offline/PDF baseline for key budgets (including Honorarium & Makan-Minum division)
@@ -195,9 +217,11 @@ export default function App() {
     try {
       localStorage.setItem("apbd_2026_transactions", JSON.stringify(transactions));
     } catch (e) {
-      console.error("Gagal menyimpan transaksi ke local storage:", e);
-      showToast("Penyimpanan lokal penuh karena lampiran PDF cukup besar. Hubungkan ke Google Drive untuk penyimpanan cloud praktis!", "warn");
+      // IndexedDB database is active and working, so we do not prompt error on exceeding localStorage quota
+      console.warn("Storage quota exceeded in localStorage for transactions, saved in IndexedDB instead.", e);
     }
+    // Always persist to IndexedDB asynchronously (handles hundreds of MBs seamlessly)
+    saveToDB("apbd_2026_transactions", transactions);
   }, [transactions]);
 
   // --- THEME STATE ---
@@ -486,8 +510,14 @@ export default function App() {
     setTransactions(pendingRestoreData.transactions);
     
     // Core persistence
-    localStorage.setItem("apbd_2026_categories", JSON.stringify(pendingRestoreData.categories));
-    localStorage.setItem("apbd_2026_transactions", JSON.stringify(pendingRestoreData.transactions));
+    try {
+      localStorage.setItem("apbd_2026_categories", JSON.stringify(pendingRestoreData.categories));
+      localStorage.setItem("apbd_2026_transactions", JSON.stringify(pendingRestoreData.transactions));
+    } catch (e) {
+      console.warn("Storage quota exceeded in localStorage, fallback to IndexedDB only for restores.", e);
+    }
+    saveToDB("apbd_2026_categories", pendingRestoreData.categories);
+    saveToDB("apbd_2026_transactions", pendingRestoreData.transactions);
 
     setIsRestoreModalOpen(false);
     setPendingRestoreData(null);

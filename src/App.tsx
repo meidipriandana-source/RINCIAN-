@@ -1493,68 +1493,130 @@ export default function App() {
         doc.text("Belum ada mutasi pembayaran / kuitansi realisasi yang direkam untuk periode ini.", 17, y + 5.5);
         y += 8;
       } else {
-        activeTxs.forEach((tx) => {
-          const catObject = categories.find((c) => c.id === tx.categoryId);
-          const catName = catObject?.nama || "Lainnya";
-          const subItemName = catObject?.items?.find((i) => i.id === tx.itemId)?.nama || "Lainnya";
+        categories.forEach((cat) => {
+          const catTxs = activeTxs.filter(tx => tx.categoryId === cat.id);
+          if (catTxs.length === 0) return;
 
-          const cleanCatName = catName.replace("Belanja ", "").split(" - ")[0];
-          const fullCatSub = `[${cleanCatName}] ${subItemName}`;
-          
-          // Split both columns using standard jsPDF utility to fit their respective widths
-          const catSubLines = doc.splitTextToSize(fullCatSub, 95) as string[];
-          const descLines = doc.splitTextToSize(tx.description, 150) as string[];
-
-          const maxLines = Math.max(catSubLines.length, descLines.length);
-          const rowHeight = Math.max(8, maxLines * 4.5 + 4);
-
-          if (y + rowHeight > 185) {
+          // Ensure enough space for the Category Separator Header
+          if (y + 12 > 185) {
             doc.addPage();
             currentPage++;
             drawHeader(currentPage);
-            
             y = 38;
-            doc.setFillColor(240, 242, 245);
-            doc.rect(15, y, 325.6, 8, "F");
-            doc.setDrawColor(210, 215, 220);
-            doc.rect(15, y, 325.6, 8, "D");
-
-            doc.setFont("helvetica", "bold");
-            doc.setFontSize(10);
-            doc.setTextColor(50, 60, 70);
-            doc.text("Tanggal", 17, y + 5.5);
-            doc.text("Kategori & Sub-item Anggaran", 40, y + 5.5);
-            doc.text("Uraian / Keterangan Kuitansi", 145, y + 5.5);
-            doc.text("Nominal (IDR)", 305, y + 5.5);
-            y += 8;
           }
 
-          doc.setFont("helvetica", "normal");
-          doc.setFontSize(9);
-          doc.setTextColor(TEXT_DARK[0], TEXT_DARK[1], TEXT_DARK[2]);
+          // Category Subheader Row
+          doc.setFillColor(235, 241, 250);
+          doc.rect(15, y, 325.6, 6, "F");
+          doc.setDrawColor(200, 210, 225);
+          doc.rect(15, y, 325.6, 6, "D");
 
-          // Tanggal
-          doc.text(tx.date, 17, y + 5.5);
-
-          // Kategori & Sub-item Anggaran
-          catSubLines.forEach((line, index) => {
-            doc.text(line, 40, y + 5.5 + (index * 4.5));
-          });
-
-          // Uraian / Keterangan Kuitansi
-          descLines.forEach((line, index) => {
-            doc.text(line, 145, y + 5.5 + (index * 4.5));
-          });
-          
           doc.setFont("helvetica", "bold");
-          doc.text(tx.amount.toLocaleString("id-ID"), 305, y + 5.5);
-          doc.setFont("helvetica", "normal");
+          doc.setFontSize(9);
+          doc.setTextColor(PRIMARY_COLOR[0], PRIMARY_COLOR[1], PRIMARY_COLOR[2]);
+          doc.text(`KATEGORI: ${cat.nama.toUpperCase()} (${cat.kode})`, 17, y + 4.5);
+          y += 6;
 
-          doc.setDrawColor(245, 247, 250);
-          doc.setLineWidth(0.1);
-          doc.line(15, y + rowHeight, 340.6, y + rowHeight);
+          catTxs.forEach((tx) => {
+            const subItemName = cat.items?.find((i) => i.id === tx.itemId)?.nama || "Lainnya";
+            const cleanCatName = cat.nama.replace("Belanja ", "").split(" - ")[0];
+            const fullCatSub = `[${cleanCatName}] ${subItemName}`;
 
-          y += rowHeight;
+            const catSubLines = doc.splitTextToSize(fullCatSub, 95) as string[];
+            const descLines = doc.splitTextToSize(tx.description, 150) as string[];
+
+            const maxLines = Math.max(catSubLines.length, descLines.length);
+            const rowHeight = Math.max(8, maxLines * 4.5 + 4);
+
+            if (y + rowHeight > 185) {
+              doc.addPage();
+              currentPage++;
+              drawHeader(currentPage);
+              
+              y = 38;
+              doc.setFillColor(240, 242, 245);
+              doc.rect(15, y, 325.6, 8, "F");
+              doc.setDrawColor(210, 215, 220);
+              doc.rect(15, y, 325.6, 8, "D");
+
+              doc.setFont("helvetica", "bold");
+              doc.setFontSize(10);
+              doc.setTextColor(50, 60, 70);
+              doc.text("Tanggal", 17, y + 5.5);
+              doc.text("Kategori & Sub-item Anggaran", 40, y + 5.5);
+              doc.text("Uraian / Keterangan Kuitansi", 145, y + 5.5);
+              doc.text("Nominal (IDR)", 305, y + 5.5);
+              y += 8;
+
+              // Redraw ongoing category subheader context after page break
+              doc.setFillColor(235, 241, 250);
+              doc.rect(15, y, 325.6, 6, "F");
+              doc.setDrawColor(200, 210, 225);
+              doc.rect(15, y, 325.6, 6, "D");
+
+              doc.setFont("helvetica", "bold");
+              doc.setFontSize(9);
+              doc.setTextColor(PRIMARY_COLOR[0], PRIMARY_COLOR[1], PRIMARY_COLOR[2]);
+              doc.text(`KATEGORI: ${cat.nama.toUpperCase()} (${cat.kode}) - LANJUTAN`, 17, y + 4.5);
+              y += 6;
+            }
+
+            doc.setFont("helvetica", "normal");
+            doc.setFontSize(9);
+            doc.setTextColor(TEXT_DARK[0], TEXT_DARK[1], TEXT_DARK[2]);
+
+            // Tanggal
+            doc.text(tx.date, 17, y + 5.5);
+
+            // Kategori & Sub-item Anggaran
+            catSubLines.forEach((line, index) => {
+              doc.text(line, 40, y + 5.5 + (index * 4.5));
+            });
+
+            // Uraian / Keterangan Kuitansi
+            descLines.forEach((line, index) => {
+              doc.text(line, 145, y + 5.5 + (index * 4.5));
+            });
+
+            doc.setFont("helvetica", "bold");
+            doc.text(tx.amount.toLocaleString("id-ID"), 305, y + 5.5);
+            doc.setFont("helvetica", "normal");
+
+            doc.setDrawColor(245, 247, 250);
+            doc.setLineWidth(0.1);
+            doc.line(15, y + rowHeight, 340.6, y + rowHeight);
+
+            y += rowHeight;
+          });
+
+          // Subtotal Row for the Category
+          const catTotal = catTxs.reduce((sum, tx) => sum + tx.amount, 0);
+          const totalRowHeight = 8;
+          if (y + totalRowHeight > 185) {
+            doc.addPage();
+            currentPage++;
+            drawHeader(currentPage);
+            y = 38;
+          }
+
+          // Visual container for subtotal
+          doc.setFillColor(245, 247, 250);
+          doc.rect(15, y, 325.6, totalRowHeight, "F");
+          doc.setDrawColor(200, 210, 225);
+          doc.setLineWidth(0.2);
+          doc.rect(15, y, 325.6, totalRowHeight, "D");
+
+          doc.setFont("helvetica", "bold");
+          doc.setFontSize(9);
+          doc.setTextColor(33, 43, 54);
+          
+          const cleanCatNameTotal = cat.nama.replace("Belanja ", "").split(" - ")[0];
+          doc.text(`TOTAL REALISASI ${cleanCatNameTotal.toUpperCase()}`, 40, y + 5.5);
+          
+          doc.setTextColor(PRIMARY_COLOR[0], PRIMARY_COLOR[1], PRIMARY_COLOR[2]);
+          doc.text(catTotal.toLocaleString("id-ID"), 305, y + 5.5);
+          
+          y += totalRowHeight + 5; // Spacing after category block ends
         });
       }
 

@@ -18,6 +18,23 @@ export const formatNumberRaw = (amount: number) => {
   }).format(amount);
 };
 
+// Compact financial number helper (e.g. 550jt instead of 550.000.000)
+export const formatCompactNumber = (amount: number) => {
+  if (amount >= 1_000_000_000) {
+    const val = amount / 1_000_000_000;
+    return (val % 1 === 0 ? val.toFixed(0) : val.toFixed(1).replace(".", ",")) + " M";
+  }
+  if (amount >= 1_000_000) {
+    const val = amount / 1_000_000;
+    return (val % 1 === 0 ? val.toFixed(0) : val.toFixed(1).replace(".", ",")) + "jt";
+  }
+  if (amount >= 1_000) {
+    const val = amount / 1_000;
+    return (val % 1 === 0 ? val.toFixed(0) : val.toFixed(1).replace(".", ",")) + "rb";
+  }
+  return amount.toString();
+};
+
 // Calculate total plans across all categories
 export const calculateTotalRencana = (categories: BudgetCategory[]): number => {
   return categories.reduce((total, cat) => {

@@ -18,6 +18,10 @@ import {
   Wallet,
   Calendar,
   ChevronRight,
+  ChevronLeft,
+  Menu,
+  ChevronDown,
+  ChevronUp,
   Trash2,
   Edit2,
   Search,
@@ -40,9 +44,11 @@ import {
 } from "lucide-react";
 import { BudgetCategory, RealisasiTransaction, BudgetItem } from "./types";
 import { INITIAL_CATEGORIES, INITIAL_TRANSACTIONS } from "./initialData";
+import { OverviewDashboard } from "./components/OverviewDashboard";
 import {
   formatCurrency,
   formatNumberRaw,
+  formatCompactNumber,
   calculateTotalRencana,
   calculateTotalRealisasi,
   calculateCategoryRealisasi,
@@ -97,6 +103,11 @@ export default function App() {
     }
   });
 
+  const emptyMonths = useMemo(() => {
+    const monthsWithTxs = new Set(transactions.map((tx) => tx.month));
+    return Array.from({ length: 12 }).map((_, mIdx) => !monthsWithTxs.has(mIdx + 1));
+  }, [transactions]);
+
   const [highlightedTxId, setHighlightedTxId] = useState<string | null>(null);
 
   // --- GOOGLE WORKSPACE SYSTEM STATES ---
@@ -110,6 +121,8 @@ export default function App() {
 
   // --- LOCAL BACKUP & RESTORE STATES ---
   const [isRestoreModalOpen, setIsRestoreModalOpen] = useState(false);
+  const [isBackupRestoreOpen, setIsBackupRestoreOpen] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
   const [pendingRestoreData, setPendingRestoreData] = useState<{
     categories: BudgetCategory[];
     transactions: RealisasiTransaction[];
@@ -223,6 +236,20 @@ export default function App() {
 
   // --- NAVIGATION / SCREEN STATES ---
   const [activeTab, setActiveTab] = useState<string>("monitoring");
+  const [sidebarOpen, setSidebarOpen] = useState<boolean>(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("apbd_2026_sidebar_collapsed");
+      return saved === "true";
+    }
+    return false;
+  });
+
+  useEffect(() => {
+    localStorage.setItem("apbd_2026_sidebar_collapsed", sidebarCollapsed ? "true" : "false");
+  }, [sidebarCollapsed]);
+
+  const [integrationsExpanded, setIntegrationsExpanded] = useState<boolean>(false);
   const [selectedMonthFilter, setSelectedMonthFilter] = useState<number | "all">("all");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [warningFilter, setWarningFilter] = useState<string>("all"); // all, safe, warning, over
@@ -572,34 +599,34 @@ export default function App() {
       };
     } else {
       return {
-        root: "bg-[#02040a] text-slate-100",
-        panel: "bg-white/5 border border-white/10 backdrop-blur-xl shadow-xl",
-        header: "bg-white/5 border border-white/10 backdrop-blur-xl p-6 md:p-8 rounded-[32px] md:rounded-[40px] shadow-2xl",
-        cardGradient: "bg-gradient-to-br from-[#0c1020] to-[#04060d] border border-white/10 shadow-2xl",
+        root: "bg-[#121212] text-slate-100",
+        panel: "bg-[#1a1b20] border border-white/5 backdrop-blur-xl shadow-xl",
+        header: "bg-[#17181d] border border-white/5 backdrop-blur-xl p-6 md:p-8 rounded-[32px] md:rounded-[40px] shadow-2xl",
+        cardGradient: "bg-gradient-to-br from-[#1d1e24] to-[#14151a] border border-white/10 shadow-2xl",
         textWhite: "text-white",
-        textSlate100: "text-slate-100",
-        textSlate200: "text-slate-200",
-        textSlate350: "text-slate-300",
+        textSlate100: "text-slate-200",
+        textSlate200: "text-slate-300",
+        textSlate350: "text-slate-450",
         textSlate450: "text-slate-400",
         textSlate400: "text-slate-400",
         textSlate500: "text-slate-500",
-        textSlate600: "text-[#64748b]",
+        textSlate600: "text-slate-500",
         borderWhite5Or10: "border-white/5",
         borderWhite10: "border-white/10",
-        tableHeader: "bg-white/[0.04] border-b border-white/10",
-        rowHover: "hover:bg-white/[0.03] border-b border-white/[0.03]",
-        inputBg: "bg-white/5 border border-white/10",
+        tableHeader: "bg-[#1e1f26] border-b border-white/10",
+        rowHover: "hover:bg-white/[0.02] border-b border-white/[0.02]",
+        inputBg: "bg-[#18191e] border border-white/10",
         pillActive: "bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 border border-white/10 scale-[1.02]",
-        pillInactive: "text-slate-400 hover:text-white hover:bg-white/5",
-        pillNav: "bg-white/5 border border-white/10 p-1.5 rounded-3xl",
+        pillInactive: "text-slate-400 hover:text-white hover:bg-[#1e1f26]",
+        pillNav: "bg-[#18191e] border border-white/5 p-1.5 rounded-3xl",
         textIndigo300: "text-[#818cf8]",
         textIndigo400: "text-[#818cf8]",
-        bgWhite5: "bg-white/5",
-        glows: "bg-indigo-900/20",
-        modalBg: "bg-[#04060d]/95 border border-white/10 rounded-[32px] shadow-2xl text-slate-100",
-        modalOverlay: "fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md",
-        buttonReset: "bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/5",
-        buttonAddTx: "bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 text-white shadow-lg shadow-indigo-500/20",
+        bgWhite5: "bg-[#1a1b20]/60",
+        glows: "bg-indigo-500/10",
+        modalBg: "bg-[#17181d] border border-white/10 rounded-[32px] shadow-2xl text-slate-100",
+        modalOverlay: "fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md",
+        buttonReset: "bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10",
+        buttonAddTx: "bg-indigo-650 hover:bg-indigo-600 text-white",
         footerText: "text-slate-500 font-semibold"
       };
     }
@@ -770,7 +797,7 @@ export default function App() {
 
   // Filter categories according to search queries, active category tab, or dropdown alerts
   const filteredCategories = useMemo(() => {
-    const targetCategories = activeTab === "monitoring"
+    const targetCategories = (activeTab === "monitoring" || activeTab === "pagu_struktur")
       ? categories
       : categories.filter((c) => c.id === activeTab);
 
@@ -799,7 +826,7 @@ export default function App() {
 
   // --- FORM HANDLERS ---
   const handleOpenAddTx = () => {
-    const defaultCatId = activeTab !== "monitoring" ? activeTab : (categories[0]?.id || "");
+    const defaultCatId = (activeTab !== "monitoring" && activeTab !== "pagu_struktur") ? activeTab : (categories[0]?.id || "");
     const selectedCat = categories.find(c => c.id === defaultCatId) || categories[0];
     setFormCategoryId(defaultCatId);
     setFormItemId(selectedCat?.items[0]?.id || "");
@@ -1193,9 +1220,9 @@ export default function App() {
       const bName = isMonthly ? getMonthName(selectedMonthFilter as number).toUpperCase() : "";
 
       const doc = new jsPDF({
-        orientation: "portrait",
+        orientation: "landscape",
         unit: "mm",
-        format: "a4",
+        format: "legal",
       });
 
       // Colors definitions
@@ -1208,37 +1235,37 @@ export default function App() {
       const drawHeader = (pNum: number) => {
         // Draw top thin accent line
         doc.setFillColor(99, 102, 241);
-        doc.rect(0, 0, 210, 4, "F");
+        doc.rect(0, 0, 355.6, 4, "F");
 
         // Document Title block
         doc.setFont("helvetica", "bold");
-        doc.setFontSize(10);
+        doc.setFontSize(11);
         doc.setTextColor(110, 120, 130);
         doc.text("RSUD dr. H. JUSUF SK TARAKAN", 15, 15);
 
-        doc.setFontSize(12);
+        doc.setFontSize(14);
         doc.setTextColor(21, 32, 48);
         const docTitle = isMonthly 
-          ? `LPJ REALISASI ANGGARAN BULAN ${bName} (APBD 2026)`
-          : "LAPORAN PERTANGGUNGJAWABAN REALISASI ANGGARAN (APBD 2026)";
+          ? `LAPORAN REALISASI ANGGARAN BULAN ${bName} (APBD 2026)`
+          : "LAPORAN REALISASI ANGGARAN (APBD 2026)";
         doc.text(docTitle, 15, 22);
 
         doc.setFont("helvetica", "italic");
-        doc.setFontSize(9);
+        doc.setFontSize(10);
         doc.setTextColor(110, 120, 130);
         doc.text("Peningkatan Mutu dan Kapasitas Ketenagaan Medis Kaltara", 15, 27);
 
         // Thin separator rule
         doc.setDrawColor(220, 225, 230);
         doc.setLineWidth(0.4);
-        doc.line(15, 30, 195, 30);
+        doc.line(15, 30, 340.6, 30);
 
         // Footer-like indicator for page number
         doc.setFont("helvetica", "normal");
-        doc.setFontSize(8);
+        doc.setFontSize(9);
         doc.setTextColor(150, 155, 160);
-        doc.text(`Pertanggungjawaban Sistem APBD - Hal ${pNum}`, 195, 287, { align: "right" });
-        doc.text(`Waktu Ekspor: ${new Date().toLocaleString("id-ID")}`, 15, 287);
+        doc.text(`Pertanggungjawaban Sistem APBD - Hal ${pNum}`, 340.6, 203.9, { align: "right" });
+        doc.text(`Waktu Ekspor: ${new Date().toLocaleString("id-ID")}`, 15, 203.9);
       };
 
       drawHeader(currentPage);
@@ -1247,7 +1274,7 @@ export default function App() {
 
       // KPI CARDS BLOCK (Draw elegant boxed summary stats)
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(10);
+      doc.setFontSize(11);
       doc.setTextColor(PRIMARY_COLOR[0], PRIMARY_COLOR[1], PRIMARY_COLOR[2]);
       const sectionTitle = isMonthly 
         ? `I. RINGKASAN REKAPITULASI KINERJA KEUANGAN BULAN ${bName}`
@@ -1267,7 +1294,8 @@ export default function App() {
       const finalPercentage = totalRencana > 0 ? (cumulativeSpent / totalRencana) * 100 : 0;
 
       // Draw Grid cards for summary metrics
-      const cardWidth = 54;
+      const cardWidth = 104;
+      const gap = 6.5;
       const cardHeight = 22;
       const cardY = y;
 
@@ -1282,46 +1310,46 @@ export default function App() {
       doc.setLineWidth(0.2);
       doc.roundedRect(15, cardY, cardWidth, cardHeight, 3, 3, "D");
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(7);
+      doc.setFontSize(8.5);
       doc.setTextColor(100, 110, 120);
-      doc.text("TOTAL PAGU RENCANA", 18, cardY + 6);
-      doc.setFontSize(9);
+      doc.text("TOTAL PAGU RENCANA", 18, cardY + 7);
+      doc.setFontSize(11);
       doc.setTextColor(21, 32, 48);
-      doc.text(formatIDR(totalRencana), 18, cardY + 14);
+      doc.text(formatIDR(totalRencana), 18, cardY + 15);
 
       // Card 2: Total Realisasi
       doc.setFillColor(240, 243, 255);
-      doc.roundedRect(15 + cardWidth + 3, cardY, cardWidth, cardHeight, 3, 3, "F");
+      doc.roundedRect(15 + cardWidth + gap, cardY, cardWidth, cardHeight, 3, 3, "F");
       doc.setDrawColor(226, 232, 240);
       doc.setLineWidth(0.2);
-      doc.roundedRect(15 + cardWidth + 3, cardY, cardWidth, cardHeight, 3, 3, "D");
+      doc.roundedRect(15 + cardWidth + gap, cardY, cardWidth, cardHeight, 3, 3, "D");
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(7);
+      doc.setFontSize(8.5);
       doc.setTextColor(99, 102, 241); // Indigo color
-      const realisasiCardLabel = isMonthly ? `REALISASI BULAN ${bName}` : "TOTAL REALISASI MARET";
-      doc.text(realisasiCardLabel, 15 + cardWidth + 6, cardY + 6);
-      doc.setFontSize(9);
+      const realisasiCardLabel = isMonthly ? `REALISASI BULAN ${bName}` : "TOTAL REALISASI";
+      doc.text(realisasiCardLabel, 15 + cardWidth + gap + 3, cardY + 7);
+      doc.setFontSize(11);
       doc.setTextColor(99, 102, 241);
-      doc.text(formatIDR(totalRealisasiVal), 15 + cardWidth + 6, cardY + 14);
+      doc.text(formatIDR(totalRealisasiVal), 15 + cardWidth + gap + 3, cardY + 15);
 
       // Card 3: Sisa Anggaran (Kumulatif)
       doc.setFillColor(240, 253, 244); // light green
-      doc.roundedRect(15 + (cardWidth + 3) * 2, cardY, cardWidth, cardHeight, 3, 3, "F");
+      doc.roundedRect(15 + (cardWidth + gap) * 2, cardY, cardWidth, cardHeight, 3, 3, "F");
       doc.setDrawColor(226, 232, 240);
       doc.setLineWidth(0.2);
-      doc.roundedRect(15 + (cardWidth + 3) * 2, cardY, cardWidth, cardHeight, 3, 3, "D");
+      doc.roundedRect(15 + (cardWidth + gap) * 2, cardY, cardWidth, cardHeight, 3, 3, "D");
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(7);
+      doc.setFontSize(8.5);
       doc.setTextColor(22, 101, 52); // green
       const sisaCardLabel = isMonthly ? "SISA PAGU TAHUN (YTD)" : "SISA ANGGARAN";
-      doc.text(sisaCardLabel, 15 + (cardWidth + 3) * 2 + 3, cardY + 6);
-      doc.setFontSize(9);
+      doc.text(sisaCardLabel, 15 + (cardWidth + gap) * 2 + 3, cardY + 7);
+      doc.setFontSize(11);
       doc.setTextColor(22, 101, 52);
-      doc.text(formatIDR(sisaKeseluruhan), 15 + (cardWidth + 3) * 2 + 3, cardY + 14);
+      doc.text(formatIDR(sisaKeseluruhan), 15 + (cardWidth + gap) * 2 + 3, cardY + 15);
 
       // Sisa Budget / Percentage
       doc.setFont("helvetica", "normal");
-      doc.setFontSize(8.5);
+      doc.setFontSize(10);
       doc.setTextColor(TEXT_DARK[0], TEXT_DARK[1], TEXT_DARK[2]);
       const noteTextVal = isMonthly 
         ? `Tingkat Penyerapan Anggaran Kumulatif s/d ${getMonthName(selectedMonthFilter as number)}: ${finalPercentage.toFixed(2)}% dari total pagu rencana.`
@@ -1332,33 +1360,33 @@ export default function App() {
 
       // Section II: Rincian Anggaran Per-Kategori
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(10);
+      doc.setFontSize(11);
       doc.setTextColor(PRIMARY_COLOR[0], PRIMARY_COLOR[1], PRIMARY_COLOR[2]);
       doc.text("II. RINCIAN PAGU ANGGARAN DAN REALISASI PER KATEGORI BELANJA", 15, y);
       y += 6;
 
       // Table Header for Categories
       doc.setFillColor(240, 242, 245);
-      doc.rect(15, y, 180, 7, "F");
+      doc.rect(15, y, 325.6, 8, "F");
       doc.setDrawColor(210, 215, 220);
-      doc.rect(15, y, 180, 7, "D");
+      doc.rect(15, y, 325.6, 8, "D");
 
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(7.5);
+      doc.setFontSize(10);
       doc.setTextColor(50, 60, 70);
-      doc.text("Kode", 17, y + 5);
-      doc.text("Nama Kategori Program Belanja", 42, y + 5);
-      doc.text("Rencana (IDR)", 117, y + 5);
+      doc.text("Kode", 17, y + 5.5);
+      doc.text("Nama Kategori Program Belanja", 45, y + 5.5);
+      doc.text("Rencana (IDR)", 235, y + 5.5);
       
       const relisasiLabelMain = isMonthly ? `Realisasi ${getShortMonthName(selectedMonthFilter as number)} (IDR)` : "Realisasi (IDR)";
       const sisaLabelMain = isMonthly ? "Sisa YTD (IDR)" : "Sisa (IDR)";
-      doc.text(relisasiLabelMain, 142, y + 5);
-      doc.text(sisaLabelMain, 174, y + 5);
-      y += 7;
+      doc.text(relisasiLabelMain, 270, y + 5.5);
+      doc.text(sisaLabelMain, 305, y + 5.5);
+      y += 8;
 
       categories.forEach((cat) => {
         // Page break safety check
-        if (y > 260) {
+        if (y > 180) {
           doc.addPage();
           currentPage++;
           drawHeader(currentPage);
@@ -1375,40 +1403,38 @@ export default function App() {
         const catSisa = catRencana - catCumulativeSpent;
 
         doc.setFont("helvetica", "normal");
-        doc.setFontSize(7.5);
+        doc.setFontSize(9);
         doc.setTextColor(TEXT_DARK[0], TEXT_DARK[1], TEXT_DARK[2]);
         
         let shortenedName = cat.nama;
-        if (shortenedName.length > 40) {
-          shortenedName = shortenedName.substring(0, 38) + "...";
+        if (shortenedName.length > 100) {
+          shortenedName = shortenedName.substring(0, 97) + "...";
         }
 
-        doc.text(cat.kode, 17, y + 5);
-        doc.text(shortenedName, 42, y + 5);
-        doc.text(catRencana.toLocaleString("id-ID"), 117, y + 5);
-        doc.text(catSpent.toLocaleString("id-ID"), 142, y + 5);
-        doc.text(catSisa.toLocaleString("id-ID"), 174, y + 5);
+        doc.text(cat.kode, 17, y + 5.5);
+        doc.text(shortenedName, 45, y + 5.5);
+        doc.text(catRencana.toLocaleString("id-ID"), 235, y + 5.5);
+        doc.text(catSpent.toLocaleString("id-ID"), 270, y + 5.5);
+        doc.text(catSisa.toLocaleString("id-ID"), 305, y + 5.5);
 
         // Thin separator between lines
         doc.setDrawColor(240, 242, 245);
         doc.setLineWidth(0.1);
-        doc.line(15, y + 7, 195, y + 7);
+        doc.line(15, y + 8, 340.6, y + 8);
 
-        y += 7;
+        y += 8;
       });
 
       y += 5;
 
-      // Section III: Registrasi Mutasi Realisasi
-      if (y > 240) {
-        doc.addPage();
-        currentPage++;
-        drawHeader(currentPage);
-        y = 38;
-      }
+      // Section III: Registrasi Mutasi Realisasi - Selalu dibuatkan kertas sendiri di bawahnya
+      doc.addPage();
+      currentPage++;
+      drawHeader(currentPage);
+      y = 38;
 
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(10);
+      doc.setFontSize(11);
       doc.setTextColor(PRIMARY_COLOR[0], PRIMARY_COLOR[1], PRIMARY_COLOR[2]);
       const thirdSectionLabel = isMonthly 
         ? `III. REGISTRASI JURNAL MUTASI REALISASI BULAN ${bName}`
@@ -1418,78 +1444,87 @@ export default function App() {
 
       // Table Header for Transactions
       doc.setFillColor(240, 242, 245);
-      doc.rect(15, y, 180, 7, "F");
+      doc.rect(15, y, 325.6, 8, "F");
       doc.setDrawColor(210, 215, 220);
-      doc.rect(15, y, 180, 7, "D");
+      doc.rect(15, y, 325.6, 8, "D");
 
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(7.5);
+      doc.setFontSize(10);
       doc.setTextColor(50, 60, 70);
-      doc.text("Tanggal", 17, y + 5);
-      doc.text("Kategori & Sub-item Anggaran", 38, y + 5);
-      doc.text("Uraian / Keterangan Kuitansi", 98, y + 5);
-      doc.text("Nominal (IDR)", 168, y + 5);
-      y += 7;
+      doc.text("Tanggal", 17, y + 5.5);
+      doc.text("Kategori & Sub-item Anggaran", 40, y + 5.5);
+      doc.text("Uraian / Keterangan Kuitansi", 145, y + 5.5);
+      doc.text("Nominal (IDR)", 305, y + 5.5);
+      y += 8;
 
       if (activeTxs.length === 0) {
         doc.setFont("helvetica", "italic");
-        doc.setFontSize(8);
-        doc.text("Belum ada mutasi pembayaran / kuitansi realisasi yang direkam untuk periode ini.", 17, y + 5);
-        y += 7;
+        doc.setFontSize(9.5);
+        doc.text("Belum ada mutasi pembayaran / kuitansi realisasi yang direkam untuk periode ini.", 17, y + 5.5);
+        y += 8;
       } else {
         activeTxs.forEach((tx) => {
-          if (y > 265) {
+          const catObject = categories.find((c) => c.id === tx.categoryId);
+          const catName = catObject?.nama || "Lainnya";
+          const subItemName = catObject?.items?.find((i) => i.id === tx.itemId)?.nama || "Lainnya";
+
+          const cleanCatName = catName.replace("Belanja ", "").split(" - ")[0];
+          const fullCatSub = `[${cleanCatName}] ${subItemName}`;
+          
+          // Split both columns using standard jsPDF utility to fit their respective widths
+          const catSubLines = doc.splitTextToSize(fullCatSub, 95) as string[];
+          const descLines = doc.splitTextToSize(tx.description, 150) as string[];
+
+          const maxLines = Math.max(catSubLines.length, descLines.length);
+          const rowHeight = Math.max(8, maxLines * 4.5 + 4);
+
+          if (y + rowHeight > 185) {
             doc.addPage();
             currentPage++;
             drawHeader(currentPage);
             
             y = 38;
             doc.setFillColor(240, 242, 245);
-            doc.rect(15, y, 180, 7, "F");
+            doc.rect(15, y, 325.6, 8, "F");
             doc.setDrawColor(210, 215, 220);
-            doc.rect(15, y, 180, 7, "D");
+            doc.rect(15, y, 325.6, 8, "D");
 
             doc.setFont("helvetica", "bold");
-            doc.setFontSize(7.5);
+            doc.setFontSize(10);
             doc.setTextColor(50, 60, 70);
-            doc.text("Tanggal", 17, y + 5);
-            doc.text("Kategori & Sub-item Anggaran", 38, y + 5);
-            doc.text("Uraian / Keterangan Kuitansi", 98, y + 5);
-            doc.text("Nominal (IDR)", 168, y + 5);
-            y += 7;
+            doc.text("Tanggal", 17, y + 5.5);
+            doc.text("Kategori & Sub-item Anggaran", 40, y + 5.5);
+            doc.text("Uraian / Keterangan Kuitansi", 145, y + 5.5);
+            doc.text("Nominal (IDR)", 305, y + 5.5);
+            y += 8;
           }
 
           doc.setFont("helvetica", "normal");
-          doc.setFontSize(7);
+          doc.setFontSize(9);
           doc.setTextColor(TEXT_DARK[0], TEXT_DARK[1], TEXT_DARK[2]);
 
-          const catObject = categories.find((c) => c.id === tx.categoryId);
-          const catName = catObject?.nama || "Lainnya";
-          const subItemName = catObject?.items?.find((i) => i.id === tx.itemId)?.nama || "Lainnya";
+          // Tanggal
+          doc.text(tx.date, 17, y + 5.5);
 
-          let shortCatSub = `[${catName.substring(0, 15)}] ${subItemName}`;
-          if (shortCatSub.length > 38) {
-            shortCatSub = shortCatSub.substring(0, 36) + "...";
-          }
+          // Kategori & Sub-item Anggaran
+          catSubLines.forEach((line, index) => {
+            doc.text(line, 40, y + 5.5 + (index * 4.5));
+          });
 
-          let shortDesc = tx.description;
-          if (shortDesc.length > 55) {
-            shortDesc = shortDesc.substring(0, 52) + "...";
-          }
-
-          doc.text(tx.date, 17, y + 5);
-          doc.text(shortCatSub, 38, y + 5);
-          doc.text(shortDesc, 98, y + 5);
+          // Uraian / Keterangan Kuitansi
+          descLines.forEach((line, index) => {
+            doc.text(line, 145, y + 5.5 + (index * 4.5));
+          });
           
           doc.setFont("helvetica", "bold");
-          doc.text(tx.amount.toLocaleString("id-ID"), 168, y + 5);
+          doc.text(tx.amount.toLocaleString("id-ID"), 305, y + 5.5);
           doc.setFont("helvetica", "normal");
 
           doc.setDrawColor(245, 247, 250);
           doc.setLineWidth(0.1);
-          doc.line(15, y + 7, 195, y + 7);
+          doc.line(15, y + rowHeight, 340.6, y + rowHeight);
 
-          y += 7;
+          y += rowHeight;
         });
       }
 
@@ -1501,13 +1536,13 @@ export default function App() {
       y = 38;
 
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(10);
+      doc.setFontSize(11);
       doc.setTextColor(PRIMARY_COLOR[0], PRIMARY_COLOR[1], PRIMARY_COLOR[2]);
       doc.text("IV. RINGKASAN EKSEKUTIF PENYERAPAN ANGGARAN TAHUNAN (KUMULATIF TAHUN 2026)", 15, y);
       y += 5;
 
       doc.setFont("helvetica", "normal");
-      doc.setFontSize(7.5);
+      doc.setFontSize(9.5);
       doc.setTextColor(TEXT_DARK[0], TEXT_DARK[1], TEXT_DARK[2]);
       doc.text("Berikut adalah analisis rekapitulasi penyerapan anggaran tahunan kumulatif (Januari s.d Desember) dibandingkan", 15, y);
       y += 4;
@@ -1516,21 +1551,21 @@ export default function App() {
 
       // Draw table header of the executive summary
       doc.setFillColor(240, 242, 245);
-      doc.rect(15, y, 180, 7, "F");
+      doc.rect(15, y, 325.6, 8, "F");
       doc.setDrawColor(210, 215, 220);
-      doc.rect(15, y, 180, 7, "D");
+      doc.rect(15, y, 325.6, 8, "D");
 
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(7);
+      doc.setFontSize(10);
       doc.setTextColor(50, 60, 70);
-      doc.text("No", 17, y + 5);
-      doc.text("Kode Rekening", 23, y + 5);
-      doc.text("Nama Kategori Program Belanja", 53, y + 5);
-      doc.text("Pagu Rencana (IDR)", 104, y + 5);
-      doc.text("Total Realisasi (IDR)", 130, y + 5);
-      doc.text("Sisa Anggaran (IDR)", 156, y + 5);
-      doc.text("Abs (%)", 185, y + 5);
-      y += 7;
+      doc.text("No", 17, y + 5.5);
+      doc.text("Kode Rekening", 23, y + 5.5);
+      doc.text("Nama Kategori Program Belanja", 53, y + 5.5);
+      doc.text("Pagu Rencana (IDR)", 190, y + 5.5);
+      doc.text("Total Realisasi (IDR)", 230, y + 5.5);
+      doc.text("Sisa Anggaran (IDR)", 270, y + 5.5);
+      doc.text("Abs (%)", 310, y + 5.5);
+      y += 8;
 
       let idxSum = 1;
       let totalRencanaYear = 0;
@@ -1546,89 +1581,53 @@ export default function App() {
         totalSpentYear += catSpent;
 
         doc.setFont("helvetica", "normal");
-        doc.setFontSize(7);
+        doc.setFontSize(9);
         doc.setTextColor(TEXT_DARK[0], TEXT_DARK[1], TEXT_DARK[2]);
 
         let shortenedName = cat.nama;
-        if (shortenedName.length > 34) {
-          shortenedName = shortenedName.substring(0, 32) + "...";
+        if (shortenedName.length > 90) {
+          shortenedName = shortenedName.substring(0, 87) + "...";
         }
 
-        doc.text(idxSum.toString(), 17, y + 5);
-        doc.text(cat.kode, 23, y + 5);
-        doc.text(shortenedName, 53, y + 5);
-        doc.text(catRencana.toLocaleString("id-ID"), 104, y + 5);
-        doc.text(catSpent.toLocaleString("id-ID"), 130, y + 5);
-        doc.text(catSisa.toLocaleString("id-ID"), 156, y + 5);
+        doc.text(idxSum.toString(), 17, y + 5.5);
+        doc.text(cat.kode, 23, y + 5.5);
+        doc.text(shortenedName, 53, y + 5.5);
+        doc.text(catRencana.toLocaleString("id-ID"), 190, y + 5.5);
+        doc.text(catSpent.toLocaleString("id-ID"), 230, y + 5.5);
+        doc.text(catSisa.toLocaleString("id-ID"), 270, y + 5.5);
         
         doc.setFont("helvetica", "bold");
-        doc.text(`${catPct.toFixed(1)}%`, 185, y + 5);
+        doc.text(`${catPct.toFixed(1)}%`, 310, y + 5.5);
         doc.setFont("helvetica", "normal");
 
         // Separator inside sum table
         doc.setDrawColor(240, 242, 245);
         doc.setLineWidth(0.1);
-        doc.line(15, y + 7, 195, y + 7);
+        doc.line(15, y + 8, 340.6, y + 8);
 
-        y += 7;
+        y += 8;
         idxSum++;
       });
 
       // Total row for summary
       doc.setFillColor(248, 250, 252);
-      doc.rect(15, y, 180, 7, "F");
+      doc.rect(15, y, 325.6, 8, "F");
       doc.setDrawColor(210, 215, 220);
-      doc.rect(15, y, 180, 7, "D");
+      doc.rect(15, y, 325.6, 8, "D");
 
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(7);
+      doc.setFontSize(10);
       doc.setTextColor(PRIMARY_COLOR[0], PRIMARY_COLOR[1], PRIMARY_COLOR[2]);
-      doc.text("TOTAL ESTIMASI TAHUNAN", 23, y + 5);
+      doc.text("TOTAL ESTIMASI TAHUNAN", 23, y + 5.5);
       
-      doc.text(totalRencanaYear.toLocaleString("id-ID"), 104, y + 5);
-      doc.text(totalSpentYear.toLocaleString("id-ID"), 130, y + 5);
-      doc.text((totalRencanaYear - totalSpentYear).toLocaleString("id-ID"), 156, y + 5);
+      doc.text(totalRencanaYear.toLocaleString("id-ID"), 190, y + 5.5);
+      doc.text(totalSpentYear.toLocaleString("id-ID"), 230, y + 5.5);
+      doc.text((totalRencanaYear - totalSpentYear).toLocaleString("id-ID"), 270, y + 5.5);
       const totalPctYear = totalRencanaYear > 0 ? (totalSpentYear / totalRencanaYear) * 100 : 0;
-      doc.text(`${totalPctYear.toFixed(1)}%`, 185, y + 5);
+      doc.text(`${totalPctYear.toFixed(1)}%`, 310, y + 5.5);
       y += 12;
 
-      // Legal Signatures Section directly follows on the final page
-      if (y > 220) {
-        doc.addPage();
-        currentPage++;
-        drawHeader(currentPage);
-        y = 38;
-      }
 
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(8);
-      doc.setTextColor(PRIMARY_COLOR[0], PRIMARY_COLOR[1], PRIMARY_COLOR[2]);
-      
-      const sigPlace = "Tarakan, " + new Date().toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
-      doc.text(sigPlace, 140, y);
-      y += 5;
-      
-      doc.text("Disetujui Oleh,", 15, y);
-      doc.text("Dibuat Oleh,", 140, y);
-      
-      y += 4;
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(7.5);
-      doc.text("Kuasa Pengguna Anggaran (KPA)", 15, y);
-      doc.text("Admin diklat RSUD", 140, y);
-
-      y += 18;
-      
-      doc.setFont("helvetica", "bold");
-      doc.setTextColor(21, 32, 48);
-      doc.text("dr. Rustan Samsuddin, M.M.", 15, y);
-      doc.text("Meidi Priandana, S.Sos,.M.Si", 140, y);
-
-      y += 4;
-      doc.setFont("helvetica", "normal");
-      doc.setTextColor(100, 110, 120);
-      doc.text("NIP. 19781203 200501 1 002", 15, y);
-      doc.text("NRPTT. 01/06/BLUD/drHJSK", 140, y);
 
       const fn = isMonthly ? `LPJ_Realisasi_APBD_Tarakan_Bulan_${bName}_2026.pdf` : `LPJ_Realisasi_APBD_Tarakan_2026.pdf`;
       doc.save(fn);
@@ -1647,9 +1646,9 @@ export default function App() {
       const bName = isMonthly ? getMonthName(selectedMonthFilter as number).toUpperCase() : "";
 
       const doc = new jsPDF({
-        orientation: "portrait",
+        orientation: "landscape",
         unit: "mm",
-        format: "a4",
+        format: "legal",
       });
 
       // Colors definitions
@@ -1661,37 +1660,37 @@ export default function App() {
       const drawHeader = (pNum: number) => {
         // Draw top thin accent line
         doc.setFillColor(99, 102, 241);
-        doc.rect(0, 0, 210, 4, "F");
+        doc.rect(0, 0, 355.6, 4, "F");
 
         // Document Title block
         doc.setFont("helvetica", "bold");
-        doc.setFontSize(10);
+        doc.setFontSize(11);
         doc.setTextColor(110, 120, 130);
         doc.text("RSUD dr. H. JUSUF SK TARAKAN", 15, 15);
 
-        doc.setFontSize(11);
+        doc.setFontSize(14);
         doc.setTextColor(21, 32, 48);
         const docTitle = isMonthly
-          ? `LAPORAN PERTANGGUNGJAWABAN REALISASI KATEGORI BULAN ${bName}`
-          : "LAPORAN PERTANGGUNGJAWABAN REALISASI KATEGORI BELANJA";
+          ? `LAPORAN REALISASI KATEGORI BULAN ${bName}`
+          : "LAPORAN REALISASI KATEGORI BELANJA";
         doc.text(docTitle, 15, 22);
 
         doc.setFont("helvetica", "italic");
-        doc.setFontSize(9);
+        doc.setFontSize(10);
         doc.setTextColor(110, 120, 130);
         doc.text("Peningkatan Mutu dan Kapasitas Ketenagaan Medis Kaltara", 15, 27);
 
         // Thin separator rule
         doc.setDrawColor(220, 225, 230);
         doc.setLineWidth(0.4);
-        doc.line(15, 30, 195, 30);
+        doc.line(15, 30, 340.6, 30);
 
         // Footer-like indicator for page number
         doc.setFont("helvetica", "normal");
-        doc.setFontSize(8);
+        doc.setFontSize(9);
         doc.setTextColor(150, 155, 160);
-        doc.text(`Detail Kategori: ${cat.nama} - Hal ${pNum}`, 195, 287, { align: "right" });
-        doc.text(`Waktu Ekspor: ${new Date().toLocaleString("id-ID")}`, 15, 287);
+        doc.text(`Detail Kategori: ${cat.nama} - Hal ${pNum}`, 340.6, 203.9, { align: "right" });
+        doc.text(`Waktu Ekspor: ${new Date().toLocaleString("id-ID")}`, 15, 203.9);
       };
 
       drawHeader(currentPage);
@@ -1700,7 +1699,7 @@ export default function App() {
 
       // I. INFORMASI KATEGORI BELANJA
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(10);
+      doc.setFontSize(11);
       doc.setTextColor(PRIMARY_COLOR[0], PRIMARY_COLOR[1], PRIMARY_COLOR[2]);
       const secITitle = isMonthly
         ? `I. INFORMASI DAN RINGKASAN REALISASI KATEGORI BULAN ${bName}`
@@ -1710,21 +1709,21 @@ export default function App() {
 
       // Metadata information box
       doc.setFillColor(248, 250, 252);
-      doc.roundedRect(15, y, 180, 16, 2, 2, "F");
+      doc.roundedRect(15, y, 325.6, 16, 2, 2, "F");
       doc.setDrawColor(226, 232, 240);
       doc.setLineWidth(0.2);
-      doc.roundedRect(15, y, 180, 16, 2, 2, "D");
+      doc.roundedRect(15, y, 325.6, 16, 2, 2, "D");
 
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(7.5);
+      doc.setFontSize(10);
       doc.setTextColor(100, 110, 120);
-      doc.text("KODE REKENING RKA:", 18, y + 5);
-      doc.text("KATEGORI PROGRAM BELANJA:", 18, y + 11);
+      doc.text("KODE REKENING RKA:", 18, y + 6);
+      doc.text("KATEGORI PROGRAM BELANJA:", 18, y + 12);
 
       doc.setFont("helvetica", "bold");
       doc.setTextColor(21, 32, 48);
-      doc.text(cat.kode, 48, y + 5);
-      doc.text(cat.nama, 63, y + 11);
+      doc.text(cat.kode, 60, y + 6);
+      doc.text(cat.nama, 75, y + 12);
 
       y += 20;
 
@@ -1740,7 +1739,8 @@ export default function App() {
       const catPercentage = catRencana > 0 ? (catCumulativeSpent / catRencana) * 100 : 0;
 
       // Draw Grid cards for summary metrics
-      const cardWidth = 54;
+      const cardWidth = 104;
+      const gap = 6.5;
       const cardHeight = 22;
       const cardY = y;
 
@@ -1755,45 +1755,45 @@ export default function App() {
       doc.setLineWidth(0.2);
       doc.roundedRect(15, cardY, cardWidth, cardHeight, 3, 3, "D");
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(7);
-      doc.setTextColor(100, 110, 120);
-      doc.text("PAGU RENCANA KATEGORI", 18, cardY + 4);
       doc.setFontSize(8.5);
+      doc.setTextColor(100, 110, 120);
+      doc.text("PAGU RENCANA KATEGORI", 18, cardY + 7);
+      doc.setFontSize(11);
       doc.setTextColor(21, 32, 48);
-      doc.text(formatIDR(catRencana), 18, cardY + 13);
+      doc.text(formatIDR(catRencana), 18, cardY + 15);
 
       // Card 2: Total Realisasi Kategori
       doc.setFillColor(240, 243, 255);
-      doc.roundedRect(15 + cardWidth + 3, cardY, cardWidth, cardHeight, 3, 3, "F");
+      doc.roundedRect(15 + cardWidth + gap, cardY, cardWidth, cardHeight, 3, 3, "F");
       doc.setDrawColor(226, 232, 240);
       doc.setLineWidth(0.2);
-      doc.roundedRect(15 + cardWidth + 3, cardY, cardWidth, cardHeight, 3, 3, "D");
+      doc.roundedRect(15 + cardWidth + gap, cardY, cardWidth, cardHeight, 3, 3, "D");
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(7);
-      doc.setTextColor(99, 102, 241);
-      const realisasiCatLabel = isMonthly ? `REALISASI BULAN ${bName}` : "TOTAL REALISASI BELANJA";
-      doc.text(realisasiCatLabel, 15 + cardWidth + 6, cardY + 4);
       doc.setFontSize(8.5);
       doc.setTextColor(99, 102, 241);
-      doc.text(formatIDR(catSpent), 15 + cardWidth + 6, cardY + 13);
+      const realisasiCatLabel = isMonthly ? `REALISASI BULAN ${bName}` : "TOTAL REALISASI BELANJA";
+      doc.text(realisasiCatLabel, 15 + cardWidth + gap + 3, cardY + 7);
+      doc.setFontSize(11);
+      doc.setTextColor(99, 102, 241);
+      doc.text(formatIDR(catSpent), 15 + cardWidth + gap + 3, cardY + 15);
 
       // Card 3: Sisa Anggaran Kategori
       doc.setFillColor(240, 253, 244); // light green
-      doc.roundedRect(15 + (cardWidth + 3) * 2, cardY, cardWidth, cardHeight, 3, 3, "F");
+      doc.roundedRect(15 + (cardWidth + gap) * 2, cardY, cardWidth, cardHeight, 3, 3, "F");
       doc.setDrawColor(226, 232, 240);
       doc.setLineWidth(0.2);
-      doc.roundedRect(15 + (cardWidth + 3) * 2, cardY, cardWidth, cardHeight, 3, 3, "D");
+      doc.roundedRect(15 + (cardWidth + gap) * 2, cardY, cardWidth, cardHeight, 3, 3, "D");
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(7);
+      doc.setFontSize(8.5);
       doc.setTextColor(22, 101, 52); // green
       const sisaCatLabel = isMonthly ? "SISA BUDGET KATEGORI (Kumulatif)" : "SISA BUDGET KATEGORI";
-      doc.text(sisaCatLabel, 15 + (cardWidth + 3) * 2 + 3, cardY + 4);
-      doc.setFontSize(8.5);
+      doc.text(sisaCatLabel, 15 + (cardWidth + gap) * 2 + 3, cardY + 7);
+      doc.setFontSize(11);
       doc.setTextColor(22, 101, 52);
-      doc.text(formatIDR(catSisa), 15 + (cardWidth + 3) * 2 + 3, cardY + 13);
+      doc.text(formatIDR(catSisa), 15 + (cardWidth + gap) * 2 + 3, cardY + 15);
 
       doc.setFont("helvetica", "normal");
-      doc.setFontSize(8);
+      doc.setFontSize(10);
       doc.setTextColor(TEXT_DARK[0], TEXT_DARK[1], TEXT_DARK[2]);
       const catNote = isMonthly
         ? `Persentase Penyerapan Belanja Kategori (Kumulatif s/d ${getMonthName(selectedMonthFilter as number)}): ${catPercentage.toFixed(2)}% dari total alokasi pagu rencana yang ditetapkan.`
@@ -1804,7 +1804,7 @@ export default function App() {
 
       // Section II: Rincian Sub-item Belanja
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(10);
+      doc.setFontSize(11);
       doc.setTextColor(PRIMARY_COLOR[0], PRIMARY_COLOR[1], PRIMARY_COLOR[2]);
       const secIITitle = isMonthly
         ? `II. RINCIAN ALOKASI DAN PENYERAPAN SUB-ITEM BULAN ${bName}`
@@ -1814,23 +1814,23 @@ export default function App() {
 
       // Table Header for Sub-items
       doc.setFillColor(240, 242, 245);
-      doc.rect(15, y, 180, 7, "F");
+      doc.rect(15, y, 325.6, 8, "F");
       doc.setDrawColor(210, 215, 220);
-      doc.rect(15, y, 180, 7, "D");
+      doc.rect(15, y, 325.6, 8, "D");
 
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(7.5);
+      doc.setFontSize(10);
       doc.setTextColor(50, 60, 70);
-      doc.text("Nama Sub-Item Rekening Belanja", 17, y + 5);
-      doc.text("Alokasi Rencana (IDR)", 112, y + 5);
+      doc.text("Nama Sub-Item Rekening Belanja", 17, y + 5.5);
+      doc.text("Alokasi Rencana (IDR)", 235, y + 5.5);
       const subItemSpentLabel = isMonthly ? `Realisasi ${getShortMonthName(selectedMonthFilter as number)} (IDR)` : "Realisasi (IDR)";
       const subItemSisaLabel = isMonthly ? "Sisa YTD (IDR)" : "Sisa (IDR)";
-      doc.text(subItemSpentLabel, 142, y + 5);
-      doc.text(subItemSisaLabel, 172, y + 5);
-      y += 7;
+      doc.text(subItemSpentLabel, 270, y + 5.5);
+      doc.text(subItemSisaLabel, 305, y + 5.5);
+      y += 8;
 
       cat.items.forEach((item) => {
-        if (y > 260) {
+        if (y > 180) {
           doc.addPage();
           currentPage++;
           drawHeader(currentPage);
@@ -1846,30 +1846,30 @@ export default function App() {
         const itemSisa = item.rencana - itemCumulativeSpent;
 
         doc.setFont("helvetica", "normal");
-        doc.setFontSize(7.5);
+        doc.setFontSize(9);
         doc.setTextColor(TEXT_DARK[0], TEXT_DARK[1], TEXT_DARK[2]);
 
         let sName = item.nama;
-        if (sName.length > 55) {
-          sName = sName.substring(0, 52) + "...";
+        if (sName.length > 100) {
+          sName = sName.substring(0, 97) + "...";
         }
 
-        doc.text(sName, 17, y + 5);
-        doc.text(item.rencana.toLocaleString("id-ID"), 112, y + 5);
-        doc.text(itemSpent.toLocaleString("id-ID"), 142, y + 5);
-        doc.text(itemSisa.toLocaleString("id-ID"), 172, y + 5);
+        doc.text(sName, 17, y + 5.5);
+        doc.text(item.rencana.toLocaleString("id-ID"), 235, y + 5.5);
+        doc.text(itemSpent.toLocaleString("id-ID"), 270, y + 5.5);
+        doc.text(itemSisa.toLocaleString("id-ID"), 305, y + 5.5);
 
         doc.setDrawColor(240, 242, 245);
         doc.setLineWidth(0.1);
-        doc.line(15, y + 7, 195, y + 7);
+        doc.line(15, y + 8, 340.6, y + 8);
 
-        y += 7;
+        y += 8;
       });
 
       y += 5;
 
       // Section III: Histori Kuitansi Realisasi Kategori
-      if (y > 240) {
+      if (y > 165) {
         doc.addPage();
         currentPage++;
         drawHeader(currentPage);
@@ -1877,7 +1877,7 @@ export default function App() {
       }
 
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(10);
+      doc.setFontSize(11);
       doc.setTextColor(PRIMARY_COLOR[0], PRIMARY_COLOR[1], PRIMARY_COLOR[2]);
       const secIIITitle = isMonthly
         ? `III. HISTORI KUITANSI REALISASI KATEGORI BULAN ${bName}`
@@ -1887,122 +1887,85 @@ export default function App() {
 
       // Table Header for Transactions
       doc.setFillColor(240, 242, 245);
-      doc.rect(15, y, 180, 7, "F");
+      doc.rect(15, y, 325.6, 8, "F");
       doc.setDrawColor(210, 215, 220);
-      doc.rect(15, y, 180, 7, "D");
+      doc.rect(15, y, 325.6, 8, "D");
 
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(7.5);
+      doc.setFontSize(10);
       doc.setTextColor(50, 60, 70);
-      doc.text("Tanggal", 17, y + 5);
-      doc.text("Sub-item Anggaran", 38, y + 5);
-      doc.text("Uraian / Keterangan Kuitansi", 98, y + 5);
-      doc.text("Nominal (IDR)", 168, y + 5);
-      y += 7;
+      doc.text("Tanggal", 17, y + 5.5);
+      doc.text("Sub-item Anggaran", 40, y + 5.5);
+      doc.text("Uraian / Keterangan Kuitansi", 145, y + 5.5);
+      doc.text("Nominal (IDR)", 305, y + 5.5);
+      y += 8;
 
       const catTransactions = transactions.filter((tx) => tx.categoryId === cat.id && (selectedMonthFilter === "all" || tx.month === selectedMonthFilter));
 
       if (catTransactions.length === 0) {
         doc.setFont("helvetica", "italic");
-        doc.setFontSize(8);
+        doc.setFontSize(9.5);
         const emptyLabel = isMonthly
           ? `Belum ada bukti kuitansi realisasi yang direkam untuk kategori belanja ini di bulan ${getMonthName(selectedMonthFilter as number)}.`
           : "Belum ada bukti kuitansi realisasi yang direkam untuk kategori belanja ini.";
-        doc.text(emptyLabel, 17, y + 5);
-        y += 7;
+        doc.text(emptyLabel, 17, y + 5.5);
+        y += 8;
       } else {
         catTransactions.forEach((tx) => {
-          if (y > 265) {
+          if (y > 180) {
             doc.addPage();
             currentPage++;
             drawHeader(currentPage);
 
             y = 38;
             doc.setFillColor(240, 242, 245);
-            doc.rect(15, y, 180, 7, "F");
+            doc.rect(15, y, 325.6, 8, "F");
             doc.setDrawColor(210, 215, 220);
-            doc.rect(15, y, 180, 7, "D");
+            doc.rect(15, y, 325.6, 8, "D");
 
             doc.setFont("helvetica", "bold");
-            doc.setFontSize(7.5);
+            doc.setFontSize(10);
             doc.setTextColor(50, 60, 70);
-            doc.text("Tanggal", 17, y + 5);
-            doc.text("Sub-item Anggaran", 38, y + 5);
-            doc.text("Uraian / Keterangan Kuitansi", 98, y + 5);
-            doc.text("Nominal (IDR)", 168, y + 5);
-            y += 7;
+            doc.text("Tanggal", 17, y + 5.5);
+            doc.text("Sub-item Anggaran", 40, y + 5.5);
+            doc.text("Uraian / Keterangan Kuitansi", 145, y + 5.5);
+            doc.text("Nominal (IDR)", 305, y + 5.5);
+            y += 8;
           }
 
           doc.setFont("helvetica", "normal");
-          doc.setFontSize(7);
+          doc.setFontSize(9);
           doc.setTextColor(TEXT_DARK[0], TEXT_DARK[1], TEXT_DARK[2]);
 
           const subItemName = cat.items.find((i) => i.id === tx.itemId)?.nama || "Lainnya";
 
           let shortSub = subItemName;
-          if (shortSub.length > 38) {
-            shortSub = shortSub.substring(0, 36) + "...";
+          if (shortSub.length > 80) {
+            shortSub = shortSub.substring(0, 77) + "...";
           }
 
           let shortDesc = tx.description;
-          if (shortDesc.length > 55) {
-            shortDesc = shortDesc.substring(0, 52) + "...";
+          if (shortDesc.length > 120) {
+            shortDesc = shortDesc.substring(0, 117) + "...";
           }
 
-          doc.text(tx.date, 17, y + 5);
-          doc.text(shortSub, 38, y + 5);
-          doc.text(shortDesc, 98, y + 5);
+          doc.text(tx.date, 17, y + 5.5);
+          doc.text(shortSub, 40, y + 5.5);
+          doc.text(shortDesc, 145, y + 5.5);
 
           doc.setFont("helvetica", "bold");
-          doc.text(tx.amount.toLocaleString("id-ID"), 168, y + 5);
+          doc.text(tx.amount.toLocaleString("id-ID"), 305, y + 5.5);
           doc.setFont("helvetica", "normal");
 
           doc.setDrawColor(245, 247, 250);
           doc.setLineWidth(0.1);
-          doc.line(15, y + 7, 195, y + 7);
+          doc.line(15, y + 8, 340.6, y + 8);
 
-          y += 7;
+          y += 8;
         });
       }
 
-      // Legal Signatures Section
-      if (y > 220) {
-        doc.addPage();
-        currentPage++;
-        drawHeader(currentPage);
-        y = 38;
-      }
 
-      y += 10;
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(8);
-      doc.setTextColor(PRIMARY_COLOR[0], PRIMARY_COLOR[1], PRIMARY_COLOR[2]);
-
-      const sigPlace = "Tarakan, " + new Date().toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
-      doc.text(sigPlace, 140, y);
-      y += 5;
-
-      doc.text("Disetujui Oleh,", 15, y);
-      doc.text("Dibuat Oleh,", 140, y);
-
-      y += 4;
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(7.5);
-      doc.text("Kuasa Pengguna Anggaran (KPA)", 15, y);
-      doc.text("Admin diklat RSUD", 140, y);
-
-      y += 18;
-
-      doc.setFont("helvetica", "bold");
-      doc.setTextColor(21, 32, 48);
-      doc.text("dr. Rustan Samsuddin, M.M.", 15, y);
-      doc.text("Meidi Priandana, S.Sos,.M.Si", 140, y);
-
-      y += 4;
-      doc.setFont("helvetica", "normal");
-      doc.setTextColor(100, 110, 120);
-      doc.text("NIP. 19781203 200501 1 002", 15, y);
-      doc.text("NRPTT. 01/06/BLUD/drHJSK", 140, y);
 
       const fn = isMonthly ? `Laporan_APBD_Kategori_${cat.id.toUpperCase()}_Bulan_${bName}_2026.pdf` : `Laporan_APBD_Kategori_${cat.id.toUpperCase()}_2026.pdf`;
       doc.save(fn);
@@ -2094,14 +2057,14 @@ export default function App() {
 
   // Selected Category Workspace Context (if not monitoring)
   const categoryWorkspace = useMemo(() => {
-    if (activeTab === "monitoring") return null;
+    if (activeTab === "monitoring" || activeTab === "pagu_struktur") return null;
     return categories.find((c) => c.id === activeTab) || null;
   }, [activeTab, categories]);
 
   // Transactions specific to currently active Tab Kategori and chosen month
   const filteredTransactions = useMemo(() => {
     let list = transactions;
-    if (activeTab !== "monitoring") {
+    if (activeTab !== "monitoring" && activeTab !== "pagu_struktur") {
       list = list.filter(tx => tx.categoryId === activeTab);
     }
     if (selectedMonthFilter !== "all") {
@@ -2111,203 +2074,298 @@ export default function App() {
   }, [transactions, activeTab, selectedMonthFilter]);
 
   return (
-    <div id="app_root" className={`min-h-screen font-sans antialiased relative overflow-x-hidden transition-colors duration-300 ${themeClasses.root}`}>
+    <div id="app_root" className={`min-h-screen font-sans antialiased relative overflow-x-hidden flex flex-col lg:flex-row transition-colors duration-300 ${themeClasses.root}`}>
       
       {/* ATMOSPHERIC BACKGROUND GLOWS - IMMERSIVE UI */}
-      <div className={`absolute top-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full blur-[120px] pointer-events-none transition-all duration-500 ${isLight ? 'bg-indigo-300/15' : isNavy ? 'bg-indigo-900/15' : 'bg-indigo-900/20'}`}></div>
-      <div className={`absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] rounded-full blur-[120px] pointer-events-none transition-all duration-500 ${isLight ? 'bg-purple-300/10' : isNavy ? 'bg-purple-900/15' : 'bg-purple-900/20'}`}></div>
+      <div className={`absolute top-[-10%] left-[-10%] w-[30%] h-[30%] rounded-full blur-[120px] pointer-events-none transition-all duration-500 ${isLight ? 'bg-indigo-300/10' : isNavy ? 'bg-indigo-900/10' : 'bg-indigo-900/15'}`}></div>
+      <div className={`absolute bottom-[-10%] right-[-10%] w-[30%] h-[30%] rounded-full blur-[120px] pointer-events-none transition-all duration-500 ${isLight ? 'bg-purple-300/5' : isNavy ? 'bg-purple-900/10' : 'bg-purple-900/15'}`}></div>
 
-      <div className="p-3 md:p-8 relative z-10 max-w-[1780px] xl:max-w-[1855px] mx-auto space-y-6 md:space-y-8">
-        
-        {/* --- SYSTEM NOTIFICATION TOAST --- */}
-        {toastMessage && (
-          <div 
-            className={`fixed top-6 right-6 z-[999] flex items-center gap-3 px-5 py-4 rounded-2xl border shadow-2xl transition-all duration-300 animate-in slide-in-from-top-4 ${
-              toastMessage.type === "success" 
-                ? "bg-emerald-950/80 border-emerald-500/30 text-emerald-300 backdrop-blur-md"
-                : toastMessage.type === "warn"
-                ? "bg-rose-950/80 border-rose-500/30 text-rose-300 backdrop-blur-md"
-                : "bg-slate-900/85 border-indigo-500/30 text-indigo-300 backdrop-blur-md"
-            }`}
-          >
-            {toastMessage.type === "success" && <CheckCircle2 size={18} className="text-emerald-400 shrink-0" />}
-            {toastMessage.type === "warn" && <AlertTriangle size={18} className="text-rose-400 shrink-0" />}
-            {toastMessage.type === "info" && <CircleAlert size={18} className="text-indigo-400 shrink-0" />}
-            <span className="text-sm font-medium tracking-wide">{toastMessage.text}</span>
-          </div>
-        )}
+      {/* --- SYSTEM NOTIFICATION TOAST --- */}
+      {toastMessage && (
+        <div 
+          className={`fixed top-6 right-6 z-[999] flex items-center gap-3 px-5 py-4 rounded-2xl border shadow-2xl transition-all duration-300 animate-in slide-in-from-top-4 ${
+            toastMessage.type === "success" 
+              ? "bg-emerald-950/85 border-emerald-500/30 text-emerald-300 backdrop-blur-md"
+              : toastMessage.type === "warn"
+              ? "bg-rose-950/85 border-rose-500/30 text-rose-300 backdrop-blur-md"
+              : "bg-slate-900/90 border-indigo-500/30 text-indigo-300 backdrop-blur-md"
+          }`}
+        >
+          {toastMessage.type === "success" && <CheckCircle2 size={18} className="text-emerald-400 shrink-0" />}
+          {toastMessage.type === "warn" && <AlertTriangle size={18} className="text-rose-400 shrink-0" />}
+          {toastMessage.type === "info" && <CircleAlert size={18} className="text-indigo-400 shrink-0" />}
+          <span className="text-sm font-medium tracking-wide">{toastMessage.text}</span>
+        </div>
+      )}
 
-        {/* --- GOOGLE WORKSPACE SYSTEM DESKTOP INTELLIGENCE COUPLING --- */}
-        <section className={`backdrop-blur-xl p-6 rounded-[32px] shadow-xl border transition-all duration-300 relative overflow-hidden ${
+      {/* ==========================================
+          LEFT NAV SIDEBAR (PERSISTENT & RESPONSIVE)
+          ========================================== */}
+      <aside 
+        className={`w-full ${sidebarCollapsed ? 'lg:w-[76px]' : 'lg:w-[310px]'} shrink-0 border-b lg:border-b-0 lg:border-r lg:sticky lg:top-0 lg:h-screen flex flex-col justify-between transition-all duration-300 z-45 overflow-y-auto no-scrollbar ${
           isLight 
-            ? 'bg-white border-slate-200' 
-            : isDark 
-            ? 'bg-[#060a16]/90 border-indigo-500/10' 
-            : 'bg-[#080f25]/90 border-blue-500/10'
-        }`}>
-          {/* Subtle backgrounds */}
-          <div className="absolute top-0 right-0 w-48 h-48 bg-indigo-500/5 rounded-full blur-[48px] pointer-events-none"></div>
-
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 relative z-10">
-            <div className="space-y-2 max-w-2xl">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className={`flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full border ${
-                  isGoogleLinked 
-                    ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' 
-                    : 'bg-amber-500/10 border-amber-500/20 text-amber-400'
-                }`}>
-                  <span className={`w-1.5 h-1.5 rounded-full ${isGoogleLinked ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`}></span>
-                  {isGoogleLinked ? 'Cloud Sync Active' : 'Cloud Sync Offline'}
-                </span>
-                
-                {isGoogleLinked && getCachedToken() && (
-                  <span className="text-[10px] font-bold bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 px-2.5 py-1 rounded-full uppercase tracking-wider">
-                    Sesi Google Drive & Sheets Terhubung
-                  </span>
-                )}
+            ? 'bg-slate-100/95 border-slate-200 text-slate-800' 
+            : isNavy 
+              ? 'bg-[#04091a] border-[#102040]/80 text-indigo-100 shadow-xl' 
+              : 'bg-[#101115] border-white/5 text-slate-100 shadow-2xl shadow-black/85'
+        } ${sidebarOpen ? 'max-h-full pb-6' : 'max-h-[72px] lg:max-h-none overflow-hidden'}`}
+      >
+        <div className="p-5 flex flex-col h-full shrink-0">
+          
+          {/* Logo / Brand Header */}
+          <div className={`flex items-center justify-between pb-6 border-b border-dashed border-slate-500/10 mb-6 font-sans ${sidebarCollapsed ? 'lg:justify-center' : ''}`}>
+            <div className={`flex items-center gap-3 ${sidebarCollapsed ? 'lg:flex-col lg:gap-1.5' : ''}`}>
+              <div 
+                onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+                className="w-10 h-10 bg-gradient-to-br from-indigo-500 via-indigo-600 to-purple-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-indigo-500/20 shrink-0 cursor-pointer hover:scale-105 transition-transform"
+                title={sidebarCollapsed ? "Perluas Menu" : ""}
+              >
+                <LayoutDashboard className="w-5 h-5 animate-pulse" strokeWidth={2} />
               </div>
-
-              <h2 className={`text-md md:text-lg font-bold tracking-tight ${themeClasses.textWhite}`}>
-                Integrasi Cloud Google Drive & Google Sheets
-              </h2>
-
-              <p className="text-xs text-slate-400 leading-relaxed max-w-xl">
-                {isGoogleLinked 
-                  ? "Sistem APBD RSUD terhubung dengan Google Workspace. Data Pagu dan rincian transaksi belanja secara otomatis disinkronkan langsung ke Spreadsheet & kuitansi pendukung diunggah ke Google Drive."
-                  : "Hubungkan dengan Akun Kemenkeu/RSUD Google Workspace untuk merekam lampiran bukti PDF langsung ke Google Drive dan melakukan sinkronisasi database dinamis secara real-time ke Google Sheets."
-                }
-              </p>
-
-              {/* Destination folder / sheet ids representation */}
-              <div className="pt-2 flex flex-col md:flex-row gap-3 text-[11px] text-slate-400 font-mono">
-                <div className={`p-2.5 rounded-xl flex items-center gap-2 border flex-1 ${isLight ? 'bg-slate-50 border-slate-100 text-slate-600' : 'bg-white/[0.02] border-white/5'}`}>
-                  <FileSpreadsheet size={14} className="text-emerald-500 shrink-0" />
-                  <span className="font-bold uppercase tracking-wider shrink-0 text-[9px] text-slate-500">Sheet:</span>
-                  <a 
-                    href={`https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/edit`} 
-                    target="_blank" 
-                    referrerPolicy="no-referrer"
-                    className="truncate hover:underline text-[#818cf8]"
-                  >
-                    {SPREADSHEET_ID}
-                  </a>
-                  <ExternalLink size={10} className="text-slate-500 shrink-0" />
-                </div>
-
-                <div className={`p-2.5 rounded-xl flex items-center gap-2 border flex-1 ${isLight ? 'bg-slate-50 border-slate-100 text-slate-600' : 'bg-white/[0.02] border-white/5'}`}>
-                  <FolderOpen size={14} className="text-indigo-400 shrink-0" />
-                  <span className="font-bold uppercase tracking-wider shrink-0 text-[9px] text-slate-500">Folder:</span>
-                  <a 
-                    href={`https://drive.google.com/drive/folders/${FOLDER_ID}`} 
-                    target="_blank" 
-                    referrerPolicy="no-referrer"
-                    className="truncate hover:underline text-[#818cf8]"
-                  >
-                    {FOLDER_ID}
-                  </a>
-                  <ExternalLink size={10} className="text-slate-500 shrink-0" />
-                </div>
+              <div className={`flex flex-col text-left transition-all duration-300 ${sidebarCollapsed ? 'lg:hidden' : ''}`}>
+                <span className="text-[10px] font-black tracking-widest uppercase leading-none text-slate-400">APBD 2026</span>
+                <h1 className="text-xs font-black tracking-tight leading-normal uppercase text-indigo-650 dark:text-[#818cf8]">RSUD JUSUF SK</h1>
+                <span className="text-[9px] text-slate-500 font-bold tracking-tight">KALTARA • DPA ACT</span>
               </div>
             </div>
+            
+            {/* Desktop Sidebar Collapse Toggle Button */}
+            <button
+              type="button"
+              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+              className={`hidden lg:flex p-1.5 rounded-xl border border-slate-500/15 text-slate-400 hover:text-[#818cf8] hover:bg-indigo-650/10 cursor-pointer transition-all shrink-0`}
+              title={sidebarCollapsed ? "Perluas Menu (Expand)" : "Sembunyikan Menu (Collapse)"}
+            >
+              {sidebarCollapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
+            </button>
 
-            {/* Sync Controls buttons */}
-            <div className="flex flex-col sm:flex-row items-stretch lg:items-center gap-3">
-              {isGoogleLinked ? (
-                <>
-                  <div className="flex flex-col gap-1 text-right mr-2 justify-center">
-                    <span className={`text-[10px] font-black uppercase tracking-wider ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
-                      {googleUser?.email || "Operator Terhubung"}
-                    </span>
-                    <span className="text-[9px] text-emerald-400 font-bold uppercase">Auto-Saved to Cloud</span>
-                  </div>
-
-                  <button
-                    onClick={loadFromSheets}
-                    disabled={isGoogleSyncLoading}
-                    className={`px-4 py-2.5 rounded-xl text-xs font-bold tracking-wider border flex items-center justify-center gap-2 cursor-pointer transition-all ${
-                      isLight 
-                        ? 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700' 
-                        : 'bg-white/5 hover:bg-white/10 border-white/10 text-white'
-                    }`}
-                  >
-                    <RefreshCw className={`w-3.5 h-3.5 ${isGoogleSyncLoading ? 'animate-spin text-indigo-400' : ''}`} />
-                    Tarik Data Sheets
-                  </button>
-
-                  <button
-                    onClick={handleGoogleLogout}
-                    className="px-4 py-2.5 rounded-xl text-xs font-bold tracking-wider bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 text-rose-400 flex items-center justify-center gap-2 cursor-pointer transition-colors"
-                  >
-                    <LogOut className="w-3.5 h-3.5" />
-                    Putus Tautan
-                  </button>
-                </>
-              ) : (
-                <button
-                  onClick={handleGoogleLogin}
-                  disabled={isGoogleSyncLoading}
-                  className="px-5 py-3 cursor-pointer rounded-xl text-xs font-black tracking-wide bg-[#818cf8] hover:bg-indigo-600 text-white flex items-center justify-center gap-3 shadow-lg shadow-indigo-500/20 transition-all hover:-translate-y-0.5"
-                >
-                  {isGoogleSyncLoading ? (
-                    <RefreshCw className="w-4 h-4 animate-spin text-white" />
-                  ) : (
-                    <Globe className="w-4 h-4 text-white" />
-                  )}
-                  <span>OTORISASI GOOGLE CLOUD SYNC</span>
-                </button>
-              )}
-            </div>
+            {/* Mobile Sidebar Hamburger Toggle */}
+            <button 
+              type="button"
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+              className="lg:hidden p-2 rounded-xl border border-slate-500/15 text-slate-405 hover:text-white"
+            >
+              <Menu size={16} />
+            </button>
           </div>
 
-          {/* Divider */}
-          <div className="my-5 border-t border-slate-200/20 dark:border-white/5"></div>
+          {/* Scrolling navigation options */}
+          <div className="space-y-6 flex-1 pr-1 text-left font-sans">
+            <div>
+              <p className={`text-[9px] font-black tracking-widest text-slate-500 uppercase px-2 mb-2 ${sidebarCollapsed ? 'lg:hidden' : ''}`}>UTAMA</p>
+              <nav className="space-y-1">
+                {/* 1. OVERVIEW DASHBOARD BUTTON */}
+                <button
+                  onClick={() => { setActiveTab("monitoring"); setSidebarOpen(false); }}
+                  className={`w-full flex items-center justify-between px-3.5 py-3 rounded-xl text-xs font-bold transition-all gap-3 cursor-pointer ${
+                    activeTab === "monitoring"
+                      ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/20 font-black scale-[1.01]"
+                      : `${isLight ? 'text-slate-650 hover:bg-slate-200/50 hover:text-indigo-600' : 'text-slate-400 hover:bg-white/5 hover:text-white'}`
+                  } ${sidebarCollapsed ? 'lg:justify-center lg:px-0 lg:h-10 lg:w-10 lg:mx-auto' : ''}`}
+                  title="Overview Dashboard"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <LayoutDashboard size={14} />
+                    <span className={sidebarCollapsed ? "lg:hidden" : ""}>Overview Dashboard</span>
+                  </div>
+                  <ChevronRight size={12} className={`opacity-40 transition-transform ${activeTab === 'monitoring' ? 'rotate-90' : ''} ${sidebarCollapsed ? 'lg:hidden' : ''}`} />
+                </button>
 
-          {/* Local Backup & Restore Sub-section */}
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 relative z-10 text-xs text-slate-400">
-            <div className="space-y-1 justify-center">
-              <h3 className={`text-xs font-bold tracking-tight ${themeClasses.textWhite} flex items-center gap-1.5`}>
-                <Database className="text-amber-500 shrink-0" size={14} />
-                <span>Utilitas Backup & Restore Lokal (Format JSON)</span>
-              </h3>
-              <p className="text-[11px] leading-relaxed max-w-xl text-slate-400/90">
-                Amankan draf anggaran dan riwayat rincian belanja offline Anda. Unduh salinan cadangan instan atau pulihkan dari berkas JSON yang pernah diekspor sebelumnya.
-              </p>
+                {/* 2. ALL CATEGORIES RKA SPREADSHEET TABLE BUTTON */}
+                <button
+                  onClick={() => { setActiveTab("pagu_struktur"); setSidebarOpen(false); }}
+                  className={`w-full flex items-center justify-between px-3.5 py-3 rounded-xl text-xs font-bold transition-all gap-3 cursor-pointer ${
+                    activeTab === "pagu_struktur"
+                      ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/20 font-black scale-[1.01]"
+                      : `${isLight ? 'text-slate-650 hover:bg-slate-200/50 hover:text-indigo-600' : 'text-slate-400 hover:bg-white/5 hover:text-white'}`
+                  } ${sidebarCollapsed ? 'lg:justify-center lg:px-0 lg:h-10 lg:w-10 lg:mx-auto' : ''}`}
+                  title="Tabulasi Pagu RKA"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <FileSpreadsheet size={14} className="text-emerald-400" />
+                    <span className={sidebarCollapsed ? "lg:hidden" : ""}>Tabulasi Pagu RKA</span>
+                  </div>
+                  <span className={`text-[9px] font-semibold px-2 py-0.5 rounded-full ${activeTab === "pagu_struktur" ? "bg-white/20 text-white" : isLight ? "bg-slate-100 text-slate-600" : "bg-white/10 text-[#818cf8]"} ${sidebarCollapsed ? 'lg:hidden' : ''}`}>
+                    ALL
+                  </span>
+                </button>
+              </nav>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2">
-              {/* Backup Button */}
+            {/* CATEGORIES MODULES GROUP */}
+            <div>
+              <p className={`text-[9px] font-black tracking-widest text-slate-500 uppercase px-2 mb-2 ${sidebarCollapsed ? 'lg:hidden' : ''}`}>WORKSPACE KATEGORI</p>
+              <nav className="space-y-1">
+                {categories.map((cat) => {
+                  const TabIcon = getTabIcon(cat.id);
+                  const totalCatSpent = calculateCategoryRealisasi(cat.id, transactions);
+                  const totalCatRenc = calculateCategoryRencana(cat);
+                  const catPct = totalCatRenc > 0 ? (totalCatSpent / totalCatRenc) * 100 : 0;
+                  const isSelected = activeTab === cat.id;
+
+                  return (
+                    <button
+                      key={cat.id}
+                      onClick={() => { setActiveTab(cat.id); setSidebarOpen(false); }}
+                      className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                        isSelected
+                          ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/20 font-black scale-[1.01]"
+                          : `${isLight ? 'text-slate-650 hover:bg-slate-200/50 hover:text-indigo-600' : 'text-slate-400 hover:bg-white/5 hover:text-white'}`
+                      } ${sidebarCollapsed ? 'lg:justify-center lg:px-0 lg:h-10 lg:w-10 lg:mx-auto' : ''}`}
+                      title={cat.nama}
+                    >
+                      <div className="flex items-center gap-2.5 truncate">
+                        <TabIcon size={14} className={isSelected ? "text-white animate-pulse" : "text-slate-500"} />
+                        <span className={`truncate ${sidebarCollapsed ? "lg:hidden" : ""}`}>{cat.nama.replace("Belanja ", "").split(" - ")[0]}</span>
+                      </div>
+                      <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded-full font-bold transition-all shrink-0 ${
+                        catPct > 100 
+                          ? 'bg-rose-500 text-white animate-pulse' 
+                          : isSelected 
+                            ? 'bg-white/20 text-white' 
+                            : isLight 
+                              ? 'bg-indigo-50 text-indigo-600 font-extrabold' 
+                              : 'bg-white/10 text-indigo-305'
+                      } ${sidebarCollapsed ? 'lg:hidden' : ''}`}>
+                        {catPct.toFixed(0)}%
+                      </span>
+                    </button>
+                  );
+                })}
+              </nav>
+            </div>
+
+            {/* COLLAPSED CLOUD SYNC & LOCAL DATA PANEL */}
+            {!sidebarCollapsed && (
+              <div className={`mt-6 rounded-2xl border transition-all ${
+                isLight 
+                  ? 'bg-slate-100/50 border-slate-200/80 text-slate-650' 
+                  : 'bg-white/[0.02] border-white/5 text-slate-405'
+              }`}>
               <button
-                onClick={handleLocalBackup}
-                className={`px-4 py-2 rounded-xl text-[11px] font-bold tracking-wider border flex items-center justify-center gap-2 cursor-pointer transition-all ${
-                  isLight 
-                    ? "bg-amber-50 hover:bg-amber-100 border-amber-200 text-amber-800" 
-                    : "bg-amber-500/10 hover:bg-amber-500/20 border-amber-500/20 text-amber-400"
-                }`}
+                type="button"
+                onClick={() => setIntegrationsExpanded(!integrationsExpanded)}
+                className="w-full px-3 py-2.5 flex items-center justify-between font-bold text-[9px] uppercase tracking-wider text-slate-500 transition-colors cursor-pointer"
               >
-                <Download className="w-3.5 h-3.5" />
-                <span>Ekspor Backup (JSON)</span>
+                <span className="flex items-center gap-2">
+                  <Cloud size={12} className={isGoogleLinked ? 'text-emerald-400' : 'text-amber-500'} />
+                  <span>Koneksi & Ledger Offline</span>
+                </span>
+                {integrationsExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
               </button>
 
-              {/* Restore Button */}
-              <label
-                className={`px-4 py-2 rounded-xl text-[11px] font-bold tracking-wider border flex items-center justify-center gap-2 cursor-pointer transition-all ${
-                  isLight 
-                    ? "bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700" 
-                    : "bg-white/5 hover:bg-white/10 border-white/10 text-white"
-                }`}
-              >
-                <Upload className="w-3.5 h-3.5 text-indigo-400" />
-                <span>Impor & Pulihkan</span>
-                <input
-                  type="file"
-                  accept=".json"
-                  onChange={handleLocalRestore}
-                  className="hidden"
-                />
-              </label>
+              {integrationsExpanded && (
+                <div className="p-3 border-t border-dashed border-slate-500/15 space-y-3 font-sans text-xs">
+                  {/* Google Connection status indicator */}
+                  <div className="space-y-1 text-left">
+                    <span className={`inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full border ${
+                      isGoogleLinked ? 'bg-emerald-500/10 border-emerald-500/25 text-emerald-400' : 'bg-amber-500/10 border-amber-500/25 text-amber-400'
+                    }`}>
+                      <span className={`w-1 h-1 rounded-full ${isGoogleLinked ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`}></span>
+                      {isGoogleLinked ? 'Cloud Sync Online' : 'Cloud Sync Offline'}
+                    </span>
+                    <p className="text-[10px] text-slate-500 leading-normal">
+                      Simpan cadangan, PDF kuitansi Google Drive, dan sebarluaskan realisasi dinamis ke Google Sheets kementerian.
+                    </p>
+                  </div>
+
+                  {isGoogleLinked && (
+                    <div className="space-y-1.5 text-left border-t border-dashed border-slate-500/15 pt-2 text-[10px] font-mono select-all">
+                      <div className="flex items-center gap-1.5 truncate">
+                        <FileSpreadsheet size={11} className="text-emerald-500 shrink-0" />
+                        <a href={`https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/edit`} target="_blank" referrerPolicy="no-referrer" className="truncate hover:underline text-[#818cf8]">{SPREADSHEET_ID}</a>
+                      </div>
+                      <div className="flex items-center gap-1.5 truncate">
+                        <FolderOpen size={11} className="text-indigo-400 shrink-0" />
+                        <a href={`https://drive.google.com/drive/folders/${FOLDER_ID}`} target="_blank" referrerPolicy="no-referrer" className="truncate hover:underline text-[#818cf8]">{FOLDER_ID}</a>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Operational sync actions directly in the accordion */}
+                  <div className="space-y-1 text-left border-t border-dashed border-slate-500/15 pt-2 shrink-0">
+                    {isGoogleLinked ? (
+                      <div className="flex flex-col gap-1.5">
+                        <button
+                          onClick={loadFromSheets}
+                          disabled={isGoogleSyncLoading}
+                          className="w-full px-2.5 py-1.5 flex items-center justify-center gap-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider border border-white/10 hover:bg-white/10 text-slate-300 transition-colors cursor-pointer"
+                        >
+                          <RefreshCw className={`w-3 h-3 ${isGoogleSyncLoading ? 'animate-spin' : ''}`} />
+                          <span>Tarik Google Sheets</span>
+                        </button>
+                        <button
+                          onClick={handleGoogleLogout}
+                          className="w-full px-2.5 py-1.5 flex items-center justify-center gap-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 transition-colors cursor-pointer"
+                        >
+                          <LogOut className="w-3 h-3" />
+                          <span>Putuskan Akun</span>
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={handleGoogleLogin}
+                        disabled={isGoogleSyncLoading}
+                        className="w-full px-3 py-2 flex items-center justify-center gap-2 rounded-lg text-[10px] font-black uppercase tracking-wider bg-[#818cf8] hover:bg-indigo-600 text-white shadow-lg shadow-indigo-500/10 transition-colors cursor-pointer"
+                      >
+                        <Globe className="w-3 h-3 text-white" />
+                        <span>Koneksi Google Cloud</span>
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Local Backups */}
+                  <div className="pt-2 border-t border-dashed border-slate-500/15 space-y-1.5 text-left">
+                    <span className="text-[9px] uppercase font-black text-slate-500">File Cadangan Lokal</span>
+                    <div className="flex gap-1.5">
+                      <button
+                        onClick={handleLocalBackup}
+                        className="flex-1 px-2 py-1 flex items-center justify-center gap-1 rounded-lg text-[9px] font-bold uppercase tracking-wider border border-amber-500/20 bg-amber-500/5 hover:bg-amber-500/15 text-amber-400 transition-all cursor-pointer"
+                      >
+                        <Download className="w-3 h-3 text-amber-500" />
+                        <span>Backup</span>
+                      </button>
+                      <label className="flex-1 px-2 py-1 flex items-center justify-center gap-1 rounded-lg text-[9px] font-bold uppercase tracking-wider border border-slate-500/20 bg-white/5 text-white cursor-pointer hover:bg-white/10 transition-all">
+                        <Upload className="w-3 h-3 text-indigo-400" />
+                        <span>Restore</span>
+                        <input type="file" accept=".json" onChange={handleLocalRestore} className="hidden" />
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
+            )}
           </div>
-        </section>
+
+          {/* Footer inside the sidebar */}
+          <div className={`mt-auto pt-6 border-t border-dashed border-slate-500/10 text-left ${sidebarCollapsed ? 'lg:hidden' : ''}`}>
+            <div className="text-[9px] font-bold tracking-widest text-slate-500 uppercase leading-none">SYSTEM DESIGN</div>
+            <div className="text-[11px] font-extrabold text-slate-400 mt-1 pb-1">APBD SMART LEDGER 2026</div>
+            <div className="text-[8px] text-slate-500 uppercase mt-0.5 font-mono">Provinsi Kalimantan Utara</div>
+          </div>
+        </div>
+      </aside>
+
+      {/* ==========================================
+          MAIN VIEWPORT PANEL (FILLED ON RIGHT)
+          ========================================== */}
+      <main className="flex-1 flex flex-col p-4 md:p-8 space-y-6 md:space-y-8 min-w-0 max-w-[1780px] xl:max-w-none mx-auto relative z-10 select-none">
+        
+        {/* Mobile quick header bar */}
+        <div className="lg:hidden flex items-center justify-between p-4 rounded-2xl border bg-black/10 border-white/5 mb-2">
+          <div className="flex items-center gap-2 text-left">
+            <span className="text-xs bg-indigo-500/10 text-indigo-400 font-bold px-2 py-0.5 rounded-full border border-indigo-500/20 uppercase tracking-widest text-[8px]">DPA APBD 2026</span>
+            <h2 className="text-sm font-black text-slate-200">APBD RSUD dr. H. JUSUF SK</h2>
+          </div>
+          <button 
+            onClick={() => setSidebarOpen(true)}
+            className="p-2 ml-2 rounded-xl border border-white/10 text-indigo-300 bg-white/5 flex items-center justify-center gap-1"
+          >
+            <Menu size={16} />
+            <span className="text-[10px] font-black uppercase tracking-wider block ml-1 font-sans">Menu</span>
+          </button>
+        </div>
 
         {/* --- HEADER --- */}
         <header className={`flex flex-col lg:flex-row lg:items-center justify-between gap-6 backdrop-blur-xl p-6 md:p-8 rounded-[32px] md:rounded-[40px] shadow-2xl transition-all duration-300 ${themeClasses.header}`}>
@@ -2439,6 +2497,19 @@ export default function App() {
             >
               <Download size={14} />
               <span>Download CSV</span>
+            </button>
+
+            <button
+              onClick={() => setIsBackupRestoreOpen(true)}
+              className={`px-4 py-3 rounded-2xl text-xs font-semibold tracking-wider transition-all flex items-center gap-2 cursor-pointer ${
+                isLight 
+                  ? 'bg-amber-50 border border-amber-250 text-amber-700 hover:bg-amber-100' 
+                  : 'bg-amber-950/20 border border-amber-500/20 hover:bg-amber-950/40 text-amber-300'
+              }`}
+              title="Pencadangan & Pemulihan Sistem (Backup & Restore)"
+            >
+              <Database size={14} className="text-amber-500" />
+              <span>Backup & Restore</span>
             </button>
 
             {/* --- SNAPSHOT DASHBOARD TOGGLE BUTTON WITH PNG/JPEG DROP MENU --- */}
@@ -2582,131 +2653,25 @@ export default function App() {
           </div>
         </section>
 
-        <div id="dashboard-capture-container" className="space-y-6 md:space-y-8 p-1">
-          {/* --- MAIN STATISTICS GAUGES (Bento Layout) --- */}
-          <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          
-          {/* CORE STAT: TOTAL EXPENDITURES VS TOTAL PLANS */}
-          <div className={`rounded-[32px] p-6 md:p-8 lg:col-span-2 relative overflow-hidden shadow-2xl flex flex-col justify-between group transition-all duration-300 ${themeClasses.cardGradient}`}>
-            <div className="absolute top-0 right-0 p-6 pointer-events-none">
-              <TrendingUp className="text-indigo-400/10 w-32 h-32 transform translate-x-4 translate-y-2 group-hover:scale-105 transition-transform duration-700" />
-            </div>
-
-            <div className="relative z-10 space-y-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className={`text-[10px] uppercase font-black tracking-widest mb-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>TOTAL ANGGARAN APBD DIKELOLA</p>
-                  <h3 className={`text-3xl md:text-5xl font-light tracking-tight mb-2 font-sans transition-colors duration-300 ${themeClasses.textWhite}`}>
-                    {formatCurrency(totalAnggaran)}
-                  </h3>
-                </div>
-                <div className="text-right">
-                  <span className="text-[10px] text-slate-500 uppercase font-bold tracking-widest block mb-1">TINGKAT ABSORPSI</span>
-                  <span className={`text-2xl md:text-3xl font-extrabold tracking-tight ${persentaseRealisasi > 100 ? 'text-rose-450 text-rose-500' : 'text-indigo-450 text-indigo-500'}`}>
-                    {persentaseRealisasi.toFixed(2)}%
-                  </span>
-                </div>
-              </div>
-
-              {/* TWO COLUMN DETAIL */}
-              <div className={`grid grid-cols-1 md:grid-cols-2 gap-4 border-t pt-6 ${themeClasses.borderWhite5Or10}`}>
-                <div className={`p-4 rounded-2xl border flex items-center gap-4 transition-colors ${isLight ? 'bg-white border-slate-200/80 hover:border-slate-350' : 'bg-white/5 border-white/5 hover:border-white/10'}`}>
-                  <div className="w-10 h-10 bg-indigo-500/10 text-indigo-500 rounded-xl flex items-center justify-center shrink-0">
-                    <Wallet size={16} />
-                  </div>
-                  <div>
-                    <span className="text-[9px] text-slate-500 uppercase font-bold block mb-0.5 font-sans">Realisasi (Terpakai)</span>
-                    <span className={`text-base font-bold transition-colors ${themeClasses.textSlate100}`}>{formatCurrency(totalRealisasi)}</span>
-                  </div>
-                </div>
-
-                <div className={`p-4 rounded-2xl border flex items-center gap-4 transition-colors ${isLight ? 'bg-white border-slate-200/80 hover:border-slate-350' : 'bg-white/5 border-white/5 hover:border-white/10'}`}>
-                  <div className="w-10 h-10 bg-emerald-500/10 text-emerald-500 rounded-xl flex items-center justify-center shrink-0">
-                    <CheckCircle2 size={16} />
-                  </div>
-                  <div>
-                    <span className="text-[9px] text-slate-500 uppercase font-bold block mb-0.5 font-sans">Sisa Anggaran Tersedia</span>
-                    <span className="text-base font-bold text-emerald-500 font-mono">{formatCurrency(totalSisa)}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Progress Slider */}
-              <div className="space-y-2 pt-2">
-                <div className="flex items-center justify-between text-xs text-slate-500">
-                  <span className={`font-semibold ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>{persentaseRealisasi.toFixed(1)}% Realized</span>
-                  <span className={`font-semibold ${isLight ? 'text-slate-650' : 'text-slate-400'}`}>Sisa: {((totalSisa / totalAnggaran) * 100).toFixed(1)}%</span>
-                </div>
-                <div className={`w-full rounded-full h-2.5 overflow-hidden border ${isLight ? 'bg-slate-250 bg-slate-200 border-slate-300' : 'bg-slate-900 border-white/5'}`}>
-                  <div
-                    className={`h-full rounded-full transition-all duration-1000 ease-out shadow-[0_0_8px_rgba(99,102,241,0.5)] ${
-                      persentaseRealisasi > 100 
-                        ? 'bg-gradient-to-r from-rose-500 to-rose-450'
-                        : 'bg-gradient-to-r from-indigo-500 to-purple-500'
-                    }`}
-                    style={{ width: `${Math.min(100, persentaseRealisasi)}%` }}
-                  ></div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* CIRCLE RADIAL ABSORPTION WHEEL */}
-          <div className={`backdrop-blur-xl p-6 md:p-8 rounded-[32px] flex flex-col justify-between items-center text-center relative overflow-hidden shadow-xl transition-all duration-300 ${themeClasses.header}`}>
-            <div className="space-y-1">
-              <span className={`text-[10px] uppercase font-black tracking-widest block ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>PROPORSI PENYERAPAN</span>
-              <p className="text-xs text-slate-500 leading-relaxed">Persentase dana yang sudah tersalurkan</p>
-            </div>
-
-            {/* SVG DONUT CHART */}
-            <div className="relative w-44 h-44 flex items-center justify-center my-4">
-              <svg viewBox="0 0 100 100" className="w-full h-full transform -rotate-90 animate-in spin-in-12 duration-1000">
-                {/* Underlay bottom circle */}
-                <circle
-                  cx="50"
-                  cy="50"
-                  r="40"
-                  fill="transparent"
-                  stroke={isLight ? "rgba(0, 0, 0, 0.05)" : "rgba(255, 255, 255, 0.03)"}
-                  strokeWidth="11"
-                />
-                
-                {/* Glowing colored ring */}
-                <circle
-                  cx="50"
-                  cy="50"
-                  r="40"
-                  fill="transparent"
-                  stroke={persentaseRealisasi > 100 ? "#f43f5e" : "#6366f1"}
-                  strokeWidth="11"
-                  strokeDasharray={`${2 * Math.PI * 40}`}
-                  strokeDashoffset={`${(2 * Math.PI * 40) - (Math.min(100, persentaseRealisasi) / 100) * (2 * Math.PI * 40)}`}
-                  strokeLinecap="round"
-                  className="transition-all duration-1000 ease-out"
-                />
-              </svg>
-              <div className="absolute inset-0 flex flex-col justify-center items-center">
-                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-0.5">Tingkat KPI</span>
-                <span className={`text-3xl font-extrabold tracking-widest transition-colors duration-300 ${themeClasses.textWhite}`}>{persentaseRealisasi.toFixed(1)}%</span>
-              </div>
-            </div>
-
-            <div className="flex gap-4 w-full justify-center">
-              <div className="flex items-center gap-1.5 text-xs">
-                <div className="w-2.5 h-2.5 rounded bg-indigo-500 shadow-sm shadow-indigo-500/40"></div>
-                <span className={`text-[10px] font-bold uppercase tracking-widest ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>Realisasi</span>
-              </div>
-              <div className="flex items-center gap-1.5 text-xs">
-                <div className={`w-2.5 h-2.5 rounded ${isLight ? 'bg-slate-200' : 'bg-white/10'}`}></div>
-                <span className={`text-[10px] font-bold uppercase tracking-widest ${isLight ? 'text-slate-650' : 'text-slate-400'}`}>Sisa Budget</span>
-              </div>
-            </div>
-          </div>
-
-        </section>
+        {activeTab === "monitoring" ? (
+          <OverviewDashboard
+            categories={categories}
+            transactions={transactions}
+            theme={theme}
+            themeClasses={themeClasses}
+            totalAnggaran={totalAnggaran}
+            totalRealisasi={totalRealisasi}
+            totalSisa={totalSisa}
+            persentaseRealisasi={persentaseRealisasi}
+            monthlyRealisasiStats={monthlyRealisasiStats}
+            maxMonthValue={maxMonthValue}
+            projectionData={projectionData}
+            setActiveTab={setActiveTab}
+          />
+        ) : null}
 
         {/* --- DYNAMIC MONTHLY ABSORPTION HISTORY VERTICAL GRAPH (Pure SVG/HTML) --- */}
-        {activeTab === "monitoring" && (
+        {false && activeTab === "monitoring" && (
           <section className={`backdrop-blur-xl p-6 md:p-8 rounded-[32px] space-y-6 shadow-xl transition-all duration-300 ${themeClasses.header}`}>
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div className="space-y-1">
@@ -2780,7 +2745,7 @@ export default function App() {
         )}
 
         {/* --- DYNAMIC ANNUAL FORWARD PROJECTION CHART SECTION (Projected spent vs Remaining limit) --- */}
-        {activeTab === "monitoring" && (
+        {false && activeTab === "monitoring" && (
           <section className={`backdrop-blur-xl p-6 md:p-8 rounded-[32px] space-y-6 shadow-xl transition-all duration-300 ${themeClasses.header}`}>
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div className="space-y-1">
@@ -2865,7 +2830,7 @@ export default function App() {
             <div className={`grid grid-cols-1 lg:grid-cols-4 gap-6 p-4 rounded-2xl border ${isLight ? 'bg-[#f8fafc] border-slate-200' : 'bg-[#02040a]/40 border-white/5'}`}>
               
               {/* Chart canvas SVG - Span 3 columns */}
-              <div className="lg:col-span-3 w-full overflow-x-auto no-scrollbar pt-2">
+              <div className="lg:col-span-3 w-full overflow-x-auto custom-scrollbar pt-2">
                 <div className="min-w-[550px] relative">
                   {(() => {
                     const chartResults = projectionData.results;
@@ -3165,7 +3130,7 @@ export default function App() {
         )}
 
         {/* --- INTERACTIVE CATEGORY BUDGET PIE CHART SECTION --- */}
-        {activeTab === "monitoring" && (
+        {false && activeTab === "monitoring" && (
           <section className={`backdrop-blur-xl p-6 md:p-8 rounded-[32px] space-y-6 shadow-xl transition-all duration-300 ${themeClasses.header}`}>
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div className="space-y-1">
@@ -3216,9 +3181,10 @@ export default function App() {
               {/* Pie Chart display column - Span 5 */}
               <div id="chart_diagram_panel" className="lg:col-span-5 flex flex-col items-center justify-center relative min-h-[280px]">
                 {pieData.length > 0 ? (
-                  <div className="w-full h-[280px] transition-all relative">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
+                  <div className="w-full h-[280px] relative">
+                    <div className="absolute inset-0 w-full h-full">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
                         <Pie
                           data={pieData}
                           cx="50%"
@@ -3281,6 +3247,7 @@ export default function App() {
                         />
                       </PieChart>
                     </ResponsiveContainer>
+                  </div>
                     
                     {/* Central textual info card */}
                     <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-center transform translate-y-[-2px]">
@@ -3376,7 +3343,7 @@ export default function App() {
         )}
 
         {/* --- BUDGET CATEGORY CARDS IN OVERVIEW TAB --- */}
-        {activeTab === "monitoring" && (
+        {false && activeTab === "monitoring" && (
           <motion.section 
             initial={{ opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}
@@ -3457,11 +3424,10 @@ export default function App() {
             </div>
           </motion.section>
         )}
-        </div>
 
         {/* --- MAIN SPREADSHEET TABLE & TRANSACTION LEDGER WORKSPACE --- */}
         <section className="space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className={`flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-all duration-300 ${sidebarCollapsed ? "lg:ml-0" : "lg:-ml-[300px]"}`}>
             <h3 className={`text-xl font-bold flex items-center gap-3 transition-colors ${themeClasses.textWhite}`}>
               <span className="w-1.5 h-6 bg-gradient-to-b from-indigo-500 to-purple-400 rounded-full shadow-[0_0_8px_indigo]"></span>
               <span>{activeTab === "monitoring" ? "Uraian Struktur RKA (Semua Kategori)" : `Detail Workspace: ${categoryWorkspace?.nama}`}</span>
@@ -3511,25 +3477,35 @@ export default function App() {
             initial={{ opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.35, ease: "easeOut" }}
-            className={`text-left overflow-hidden rounded-[28px] shadow-2xl backdrop-blur-md transition-all duration-300 ${themeClasses.panel}`}
+            className={`text-left overflow-hidden rounded-[28px] shadow-2xl backdrop-blur-md transition-all duration-300 ${sidebarCollapsed ? "lg:ml-0" : "lg:-ml-[300px]"} ${themeClasses.panel}`}
           >
             
-            <div className="overflow-x-auto no-scrollbar">
-              <table className="w-full text-left border-collapse min-w-[1350px]">
+            <div className="overflow-x-auto custom-scrollbar pb-2">
+              <table className="w-full text-left border-collapse min-w-[1150px]">
                 <thead>
                   <tr className={`transition-colors ${themeClasses.tableHeader}`}>
                     <th className={`px-4 py-4 text-[11px] font-black uppercase tracking-widest w-[24%] min-w-[280px] ${isLight ? 'text-indigo-650' : 'text-[#818cf8]'}`}>Uraian Struktur Belanja</th>
-                    <th className={`px-3 py-4 text-[11px] font-black uppercase tracking-widest whitespace-nowrap text-right ${isLight ? 'text-indigo-650' : 'text-[#818cf8]'}`}>PAGU RENCANA (IDR)</th>
+                    <th className={`px-4 py-4 text-[11px] font-black uppercase tracking-widest whitespace-nowrap text-right w-[10%] min-w-[135px] ${isLight ? 'text-indigo-650' : 'text-[#818cf8]'}`}>PAGU RENCANA (IDR)</th>
                     
                     {/* Monthly Columns (Jan-Des Dynamic Render) */}
-                    {Array.from({ length: 12 }).map((_, mIdx) => (
-                      <th key={mIdx} className={`px-1 py-3 text-[10px] font-black text-slate-500 uppercase tracking-widest text-center whitespace-nowrap border-r ${isLight ? 'border-slate-200/40' : 'border-white/[0.03]'}`}>
-                        {getShortMonthName(mIdx + 1)}
-                      </th>
-                    ))}
+                    {Array.from({ length: 12 }).map((_, mIdx) => {
+                      const isEmpty = emptyMonths[mIdx];
+                      return (
+                        <th 
+                          key={mIdx} 
+                          className={`py-3 text-[11px] font-black text-slate-500 uppercase tracking-widest text-center whitespace-nowrap border-r transition-all duration-300 ${
+                            isEmpty 
+                              ? 'px-0.5 min-w-[46px] w-[3%] opacity-60' 
+                              : 'px-2 min-w-[125px] w-[8%]'
+                          } ${isLight ? 'border-slate-200/40' : 'border-white/[0.03]'}`}
+                        >
+                          {getShortMonthName(mIdx + 1)}
+                        </th>
+                      );
+                    })}
 
-                    <th className={`px-3 py-4 text-[11px] font-black uppercase tracking-widest text-right whitespace-nowrap ${isLight ? 'text-indigo-650' : 'text-[#818cf8]'}`}>REALISASI (IDR)</th>
-                    <th className={`px-3 py-4 text-[11px] font-black uppercase tracking-widest text-right whitespace-nowrap ${isLight ? 'text-indigo-650' : 'text-[#818cf8]'}`}>SISA BUDGET (IDR)</th>
+                    <th className={`px-4 py-4 text-[11px] font-black uppercase tracking-widest text-right whitespace-nowrap w-[12%] min-w-[155px] ${isLight ? 'text-indigo-650' : 'text-[#818cf8]'}`}>REALISASI (IDR)</th>
+                    <th className={`px-4 py-4 text-[11px] font-black uppercase tracking-widest text-right whitespace-nowrap w-[12%] min-w-[155px] ${isLight ? 'text-indigo-650' : 'text-[#818cf8]'}`}>SISA BUDGET (IDR)</th>
                     <th className={`px-3 py-4 text-[11px] font-black uppercase tracking-widest text-center ${isLight ? 'text-indigo-650' : 'text-[#818cf8]'}`}>TINDAKAN</th>
                   </tr>
                 </thead>
@@ -3568,7 +3544,7 @@ export default function App() {
                                 {item.nama}
                               </td>
 
-                              <td className={`px-3 py-3.5 text-xs font-extrabold text-right font-mono tracking-tight whitespace-nowrap ${themeClasses.textSlate100}`}>
+                              <td className={`px-4 py-3.5 text-xs font-extrabold text-right font-mono tracking-tight whitespace-nowrap min-w-[135px] ${themeClasses.textSlate100}`}>
                                 {formatCurrency(item.rencana)}
                               </td>
 
@@ -3576,12 +3552,17 @@ export default function App() {
                               {Array.from({ length: 12 }).map((_, mIdx) => {
                                 const localMonth = mIdx + 1;
                                 const localSpent = calculateItemMonthlySpent(item.id, localMonth, transactions);
+                                const isEmpty = emptyMonths[mIdx];
 
                                 return (
                                   <td 
                                     key={mIdx} 
-                                    className={`px-1 py-3.5 text-[10px] text-center font-mono tracking-tighter border-r ${isLight ? 'border-slate-200/40' : 'border-white/[0.02]'} ${
-                                      localSpent > 0 ? (isLight ? "text-indigo-600 font-extrabold" : "text-indigo-400 font-extrabold") : isLight ? "text-slate-300" : "text-slate-600"
+                                    className={`py-3.5 text-center font-mono tracking-normal border-r transition-all duration-300 ${
+                                      isEmpty 
+                                        ? 'px-0.5 min-w-[46px] w-[3%] text-[11px] opacity-40' 
+                                        : 'px-2 min-w-[125px] w-[8%] text-xs'
+                                    } ${isLight ? 'border-slate-200/40' : 'border-white/[0.02]'} ${
+                                      localSpent > 0 ? (isLight ? "text-indigo-600 font-extrabold" : "text-[#818cf8] font-bold") : isLight ? "text-slate-300" : "text-slate-600"
                                     }`}
                                   >
                                     {localSpent > 0 ? formatNumberRaw(localSpent) : "—"}
@@ -3589,11 +3570,11 @@ export default function App() {
                                 );
                               })}
 
-                              <td className={`px-3 py-3.5 text-xs font-extrabold text-right font-mono tracking-tight whitespace-nowrap ${spent > 0 ? (isLight ? "text-indigo-650 font-black" : "text-[#818cf8] font-black") : "text-slate-500"}`}>
+                              <td className={`px-4 py-3.5 text-xs font-extrabold text-right font-mono tracking-tight whitespace-nowrap min-w-[155px] ${spent > 0 ? (isLight ? "text-indigo-650 font-black" : "text-[#818cf8] font-black") : "text-slate-500"}`}>
                                 {spent > 0 ? formatCurrency(spent) : "Rp 0"}
                               </td>
 
-                              <td className={`px-3 py-3.5 text-xs font-extrabold text-right font-mono tracking-tight whitespace-nowrap ${remaining < 0 ? "text-rose-500 font-black" : "text-emerald-500 font-black"}`}>
+                              <td className={`px-4 py-3.5 text-xs font-extrabold text-right font-mono tracking-tight whitespace-nowrap min-w-[155px] ${remaining < 0 ? "text-rose-500 font-black" : "text-emerald-500 font-black"}`}>
                                 {formatCurrency(remaining)}
                                 {spentPct > 100 && (
                                   <span className="block text-[8px] text-rose-500 font-black uppercase mt-1 tracking-wider whitespace-normal">Lampu Merah (Defisit)</span>
@@ -3642,13 +3623,13 @@ export default function App() {
 
             <div className={`p-4 flex items-center justify-center gap-2 text-[10px] font-bold uppercase tracking-widest select-none border-t ${isLight ? 'bg-slate-50 border-slate-200 text-slate-550' : 'bg-white/[0.02] border-white/5 text-slate-500'}`}>
               <CircleAlert size={12} className="text-[#818cf8]" />
-              <span>Gunakan gesture geser ke kanan untuk menjelajahi rincian per bulan anggaran (Jan - Des)</span>
+              <span>Gunakan scrollbar atau usap layar ke kiri/kanan untuk melihat seluruh rincian bulan anggaran (Jan - Des)</span>
             </div>
           </motion.div>
         </section>
 
         {/* --- DEDICATED TRANSACTION HISTORY SECTION --- */}
-        <section className={`backdrop-blur-xl p-6 md:p-8 rounded-[32px] space-y-6 shadow-xl transition-all duration-300 ${themeClasses.header}`}>
+        <section className={`backdrop-blur-xl p-6 md:p-8 rounded-[32px] space-y-6 shadow-xl transition-all duration-300 ${sidebarCollapsed ? "lg:ml-0" : "lg:-ml-[300px]"} ${themeClasses.header}`}>
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
               <h3 className={`text-lg font-bold flex items-center gap-2 transition-all ${themeClasses.textWhite}`}>
@@ -3666,7 +3647,7 @@ export default function App() {
           </div>
 
           <div className={`overflow-hidden rounded-2xl shadow-lg border transition-all ${isLight ? 'bg-white border-slate-200' : 'bg-[#0e1220]/80 border-white/10'}`}>
-            <div className="overflow-x-auto no-scrollbar">
+            <div className="overflow-x-auto custom-scrollbar pb-2">
               <table className="w-full text-left border-collapse min-w-[800px]">
                 <thead>
                   <tr className={`transition-colors ${themeClasses.tableHeader}`}>
@@ -3777,14 +3758,14 @@ export default function App() {
         </section>
 
         {/* --- STATUTORY FOOTER --- */}
-        <footer className={`pt-8 border-t text-center text-xs space-y-2 transition-all ${isLight ? 'border-slate-200 text-slate-500' : 'border-white/5 text-slate-500'}`}>
-          <p>© 2026 APBD SMART MONITORING SYSTEM • KABUPATEN TARAKAN</p>
+        <footer className={`pt-8 border-t text-center text-xs space-y-2 transition-all duration-300 ${sidebarCollapsed ? "lg:ml-0" : "lg:-ml-[300px]"} ${isLight ? 'border-slate-200 text-slate-500' : 'border-white/5 text-slate-500'}`}>
+          <p>© 2026 APBD SMART MONITORING SYSTEM • TARAKAN</p>
           <p className={`text-[10px] tracking-wider font-semibold uppercase ${themeClasses.footerText}`}>
             RSUD dr. H. JUSUF SK (FORMERLY RSUD TARAKAN) • PENINGKATAN MUTU DAN KAPASITAS KETENAGAAN MEDIS KALTARA
           </p>
         </footer>
 
-      </div>
+      </main>
 
       {/* --- FORM 1: REKAM REALISASI FORM MODAL --- */}
       {isTxModalOpen && (
@@ -4248,6 +4229,152 @@ export default function App() {
                 <span>Ya, Tetap Simpan</span>
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* --- SYSTEM MODAL: BACKUP & RESTORE CONTROL CENTER --- */}
+      {isBackupRestoreOpen && (
+        <div className={themeClasses.modalOverlay}>
+          <div className={`w-full max-w-2xl p-6 md:p-8 text-left relative animate-in zoom-in-95 duration-200 transition-all ${themeClasses.modalBg}`}>
+            <button
+              onClick={() => setIsBackupRestoreOpen(false)}
+              className="absolute top-5 right-5 text-slate-400 hover:text-indigo-650 dark:hover:text-white transition-colors p-1 cursor-pointer"
+            >
+              <X size={18} />
+            </button>
+
+            <header className="mb-6 space-y-1">
+              <h4 className={`text-lg font-bold flex items-center gap-2 ${themeClasses.textWhite}`}>
+                <Database className="text-amber-500" size={18} />
+                <span>Pencadangan & Pemulihan Sistem (APBD 2026)</span>
+              </h4>
+              <p className="text-xs text-slate-500">
+                Kelola file cadangan offline untuk mengamankan seluruh rincian kuitansi, pagu anggaran, dan mutasi transaksi secara lokal.
+              </p>
+            </header>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* BACKUP SECTION */}
+              <div className={`p-5 rounded-2xl border flex flex-col justify-between ${
+                isLight ? 'bg-slate-50 border-slate-200' : 'bg-slate-900/40 border-slate-800'
+              }`}>
+                <div>
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="p-2 bg-amber-500/10 rounded-xl text-amber-500">
+                      <Download size={18} />
+                    </div>
+                    <span className={`text-sm font-bold ${themeClasses.textWhite}`}>Ekspor Cadangan (Backup)</span>
+                  </div>
+                  
+                  <p className="text-xs text-slate-500 leading-relaxed mb-4">
+                    Unduh salinan digital semua data anggaran dan mutasi transaksi saat ini. File ini dapat disimpan aman dan digunakan untuk pemulihan sewaktu-waktu.
+                  </p>
+
+                  <div className={`p-3 rounded-xl space-y-1.5 text-[11px] font-mono mb-6 ${
+                    isLight ? 'bg-slate-100 text-slate-700' : 'bg-white/5 text-slate-400'
+                  }`}>
+                    <div className="flex justify-between">
+                      <span>Total Kategori:</span>
+                      <span className="font-bold">{categories.length} entri</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Total Transaksi:</span>
+                      <span className="font-bold text-emerald-500">{transactions.length} item</span>
+                    </div>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleLocalBackup();
+                    setIsBackupRestoreOpen(false);
+                  }}
+                  className="w-full py-2.5 bg-amber-650 hover:bg-amber-600 text-white rounded-xl text-xs font-bold tracking-wider shadow-lg shadow-amber-600/15 transition-all cursor-pointer flex items-center justify-center gap-2"
+                >
+                  <Download size={13} />
+                  <span>Unduh File Cadangan (.json)</span>
+                </button>
+              </div>
+
+              {/* RESTORE SECTION */}
+              <div className={`p-5 rounded-2xl border flex flex-col justify-between ${
+                isLight ? 'bg-slate-50 border-slate-200' : 'bg-slate-900/40 border-slate-800'
+              }`}>
+                <div>
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="p-2 bg-indigo-500/10 rounded-xl text-indigo-400">
+                      <Upload size={18} />
+                    </div>
+                    <span className={`text-sm font-bold ${themeClasses.textWhite}`}>Pulihkan Data (Restore)</span>
+                  </div>
+
+                  <p className="text-xs text-slate-500 leading-relaxed mb-4">
+                    Unggah berkas kustom hasil ekspor (.json) Anda sebelumnya untuk memulihkan seluruh struktur data APBD. Tindakan ini akan menimpa data aktif.
+                  </p>
+
+                  {/* DRAG AND DROP ZONE */}
+                  <div 
+                    onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+                    onDragLeave={() => setIsDragging(false)}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      setIsDragging(false);
+                      const file = e.dataTransfer.files?.[0];
+                      if (file) {
+                        const fakeEvent = {
+                          target: {
+                            files: [file],
+                            value: ""
+                          }
+                        } as any;
+                        handleLocalRestore(fakeEvent);
+                        setIsBackupRestoreOpen(false);
+                      }
+                    }}
+                    className={`border-2 border-dashed rounded-xl p-4 text-center cursor-pointer transition-all flex flex-col items-center justify-center gap-2 ${
+                      isDragging 
+                        ? 'border-indigo-500 bg-indigo-500/5' 
+                        : isLight 
+                          ? 'border-slate-300 hover:bg-slate-100 bg-white' 
+                          : 'border-white/10 hover:bg-white/5 bg-[#03060c]'
+                    }`}
+                    onClick={() => document.getElementById("backup_restore_file_picker")?.click()}
+                  >
+                    <Upload size={20} className={isDragging ? 'text-indigo-400 animate-bounce' : 'text-slate-400'} />
+                    <span className="text-[11px] font-semibold text-slate-400">
+                      Seret file ke sini atau <span className="text-indigo-500 hover:underline">Pilih Berkas</span>
+                    </span>
+                    <span className="text-[9px] text-slate-500">Menerima format file cadangan .json</span>
+                    <input
+                      id="backup_restore_file_picker"
+                      type="file"
+                      accept=".json"
+                      onChange={(e) => {
+                        handleLocalRestore(e);
+                        setIsBackupRestoreOpen(false);
+                      }}
+                      className="hidden"
+                    />
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => document.getElementById("backup_restore_file_picker")?.click()}
+                  className="w-full py-2.5 border border-dashed border-slate-500/30 text-slate-400 hover:bg-white/5 hover:text-white rounded-xl text-xs font-bold tracking-wider transition-all mt-4 cursor-pointer"
+                >
+                  Pilih File Cadangan
+                </button>
+              </div>
+            </div>
+
+            <footer className="mt-6 pt-4 border-t border-dashed border-slate-500/10 text-center">
+              <p className="text-[10px] text-slate-500 font-medium">
+                🔒 Enkripsi Sisi Klien: Seluruh proses backup maupun pemulihan data dilakukan secara internal di perangkat Anda tanpa mengirimkan riwayat data ke server luar.
+              </p>
+            </footer>
           </div>
         </div>
       )}

@@ -58,11 +58,42 @@ export function resetWorkspaceConfig() {
 
 let cachedAccessToken: string | null = null;
 try {
-  cachedAccessToken = localStorage.getItem("gdrive_access_token");
+  const token = localStorage.getItem("gdrive_access_token");
+  const expiresAt = localStorage.getItem("gdrive_access_token_expires_at");
+  if (token) {
+    if (expiresAt && Date.now() > Number(expiresAt)) {
+      localStorage.removeItem("gdrive_access_token");
+      localStorage.removeItem("gdrive_access_token_expires_at");
+      cachedAccessToken = null;
+    } else {
+      cachedAccessToken = token;
+    }
+  }
 } catch (e) {
   console.error("Gagal memuat gdrive_access_token dari localStorage:", e);
 }
 let isSigningIn = false;
+
+// Decode authentication errors friendly to Indonesian users
+export function getFriendlyAuthErrorMessage(err: any): string {
+  if (!err) return "Terjadi kesalahan koneksi Google.";
+  const code = err.code || "";
+  const msg = err.message || "";
+  
+  if (code.includes("unauthorized-domain") || msg.includes("unauthorized-domain")) {
+    return "Domain ini belum diotorisasi oleh Google/Firebase Auth Anda. Harap mendaftarkan domain rincian-3rfu.vercel.app (atau domain Vercel Anda) di Firebase Console Anda > Authentication > Settings > Authorized Domains.";
+  }
+  if (code.includes("popup-blocked") || msg.includes("popup-blocked")) {
+    return "Menu pop-up diblokir oleh browser. Harap izinkan pop-up untuk aplikasi ini dan coba lagi.";
+  }
+  if (code.includes("popup-closed-by-user") || msg.includes("popup-closed-by-user")) {
+    return "Login dibatalkan karena pop-up ditutup oleh pengguna.";
+  }
+  if (code.includes("network-request-failed") || msg.includes("network-request-failed")) {
+    return "Koneksi jaringan gagal. Pastikan Anda terhubung ke internet.";
+  }
+  return msg || "Gagal melakukan autentikasi Google.";
+}
 
 // Initialize auth listener
 export const initAuth = (
@@ -71,10 +102,11 @@ export const initAuth = (
 ) => {
   return onAuthStateChanged(auth, async (user) => {
     if (user) {
-      if (cachedAccessToken) {
-        onAuthSuccess(user, cachedAccessToken);
+      const token = getCachedToken();
+      if (token) {
+        onAuthSuccess(user, token);
       } else {
-        // Token was cleared or wasn't saved in-memory yet, fallback to login screen indicators
+        // Token was cleared or expired, fallback
         onAuthFailure();
       }
     } else {
@@ -104,20 +136,108 @@ export const googleSignIn = async (): Promise<{ user: User; accessToken: string 
   }
 };
 
+// Pure client-side Google OAuth popup login (Bypasses Firebase Auth completely!)
+export const googleSignInDirect = async (customClientId: string): Promise<{ accessToken: string }> => {
+  if (isSigningIn) throw new Error("Proses login sedang berjalan.");
+  isSigningIn = true;
+  return new Promise((resolve, reject) => {
+    try {
+      const redirectUri = window.location.origin;
+      const scopes = encodeURIComponent([
+        "https://www.googleapis.com/auth/spreadsheets",
+        "https://www.googleapis.com/auth/drive"
+      ].join(" "));
+      
+      const state = Math.random().toString(36).substring(2);
+      const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${encodeURIComponent(customClientId)}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=token&scope=${scopes}&state=${state}`;
+      
+      const width = 500;
+      const height = 650;
+      const left = window.screen.width / 2 - width / 2;
+      const top = window.screen.height / 2 - height / 2;
+      
+      const popup = window.open(
+        authUrl,
+        "google_oauth_popup",
+        `width=${width},height=${height},top=${top},left=${left},toolbar=no,menubar=no,scrollbars=yes`
+      );
+      
+      if (!popup) {
+        throw new Error("Popup login diblokir browser! Harap izinkan popup untuk website ini.");
+      }
+      
+      const messageListener = (event: MessageEvent) => {
+        if (event.origin !== window.location.origin) return;
+        if (event.data?.type === "GOOGLE_OAUTH_TOKEN" && event.data?.token) {
+          window.removeEventListener("message", messageListener);
+          setCachedToken(event.data.token);
+          resolve({ accessToken: event.data.token });
+        }
+      };
+      
+      window.addEventListener("message", messageListener);
+      
+      // Polling check
+      const timer = setInterval(() => {
+        if (popup.closed) {
+          clearInterval(timer);
+          window.removeEventListener("message", messageListener);
+          isSigningIn = false;
+          
+          const token = getCachedToken();
+          if (token) {
+            resolve({ accessToken: token });
+          } else {
+            reject(new Error("Login dibatalkan oleh pengguna."));
+          }
+        }
+      }, 500);
+    } catch (err) {
+      isSigningIn = false;
+      reject(err);
+    }
+  });
+};
+
+
 export const logout = async () => {
   await auth.signOut();
   setCachedToken(null);
   localStorage.removeItem("apbd_2026_google_linked");
 };
 
-export const getCachedToken = () => cachedAccessToken;
+export const getCachedToken = () => {
+  try {
+    const token = localStorage.getItem("gdrive_access_token");
+    const expiresAt = localStorage.getItem("gdrive_access_token_expires_at");
+    if (!token) {
+      cachedAccessToken = null;
+      return null;
+    }
+    if (expiresAt && Date.now() > Number(expiresAt)) {
+      console.warn("Cached token expired. Clearing.");
+      localStorage.removeItem("gdrive_access_token");
+      localStorage.removeItem("gdrive_access_token_expires_at");
+      cachedAccessToken = null;
+      return null;
+    }
+    cachedAccessToken = token;
+    return token;
+  } catch (e) {
+    return null;
+  }
+};
+
 export const setCachedToken = (token: string | null) => {
   cachedAccessToken = token;
   try {
     if (token) {
       localStorage.setItem("gdrive_access_token", token);
+      // Google access_token is valid for exactly 1 hour (3600 seconds)
+      localStorage.setItem("gdrive_access_token_expires_at", (Date.now() + 3550 * 1000).toString());
     } else {
       localStorage.removeItem("gdrive_access_token");
+      localStorage.removeItem("gdrive_access_token_expires_at");
     }
   } catch (e) {
     console.error("Gagal menyimpan gdrive_access_token ke localStorage:", e);

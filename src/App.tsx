@@ -40,7 +40,8 @@ import {
   LogOut,
   Globe,
   ExternalLink,
-  Camera
+  Camera,
+  Key
 } from "lucide-react";
 import { BudgetCategory, RealisasiTransaction, BudgetItem } from "./types";
 import { INITIAL_CATEGORIES, INITIAL_TRANSACTIONS } from "./initialData";
@@ -61,6 +62,7 @@ import {
 import {
   initAuth,
   googleSignIn,
+  googleSignInDirect,
   logout,
   getCachedToken,
   uploadPdfToDrive,
@@ -70,7 +72,8 @@ import {
   SPREADSHEET_ID,
   createPersonalWorkspace,
   updateWorkspaceConfig,
-  resetWorkspaceConfig
+  resetWorkspaceConfig,
+  getFriendlyAuthErrorMessage
 } from "./googleWorkspace";
 import { saveToDB, loadFromDB } from "./indexedDB";
 
@@ -133,6 +136,17 @@ export default function App() {
   const [customSheetInput, setCustomSheetInput] = useState(() => {
     return localStorage.getItem("custom_apbd_spreadsheet_id") || "";
   });
+
+  // --- CUSTOM GOOGLE OAUTH CONFIGS (Bypasses Firebase Console) ---
+  const [useCustomAuth, setUseCustomAuth] = useState(() => {
+    return localStorage.getItem("google_custom_auth_active") === "true";
+  });
+  const [customClientId, setCustomClientId] = useState(() => {
+    return localStorage.getItem("google_custom_client_id") || "";
+  });
+  const [manualAccessToken, setManualAccessToken] = useState("");
+  const [showAdvancedAuthOptions, setShowAdvancedAuthOptions] = useState(false);
+
 
   // --- LOCAL BACKUP & RESTORE STATES ---
   const [isRestoreModalOpen, setIsRestoreModalOpen] = useState(false);
@@ -382,8 +396,14 @@ export default function App() {
       }
     } catch (err: any) {
       console.warn("Spreadsheet load issue:", err);
-      setGoogleSyncError(err.message || "Failed to load spreadsheet rows.");
-      showToast("Data Google Sheets Gagal dimuat. Menggunakan data lokal.", "warn");
+      // Give details when we get network failures or expired tokens
+      if (err.message && (err.message.includes("Failed to fetch") || err.message.includes("401") || err.message.includes("Unauthorized"))) {
+        setGoogleSyncError("Sesi Google Anda kedaluwarsa atau dibatalkan. Harap putuskan lalu sambungkan ulang Google Anda.");
+        showToast("Koneksi Google bermasalah (Sesi Habis). Silakan Putuskan & Sambungkan Kembali.", "warn");
+      } else {
+        setGoogleSyncError(err.message || "Gagal memuat baris spreadsheet.");
+        showToast("Gagal memuat Google Sheets. Memuat data cadangan lokal saja.", "warn");
+      }
     } finally {
       setIsGoogleSyncLoading(false);
     }
@@ -392,24 +412,64 @@ export default function App() {
   const handleGoogleLogin = async () => {
     try {
       setIsGoogleSyncLoading(true);
-      const res = await googleSignIn();
-      if (res) {
-        setGoogleUser(res.user);
-        setIsGoogleLinked(true);
-        localStorage.setItem("apbd_2026_google_linked", "true");
-        showToast("Berhasil terhubung dengan Akun Google!", "success");
-        // Start automatic reload from sheets
-        setTimeout(() => {
-          loadFromSheets();
-        }, 500);
+      if (useCustomAuth) {
+        if (!customClientId.trim()) {
+          showToast("Silakan isi Client ID Google kustom Anda terlebih dahulu di Opsi Lanjutan.", "warn");
+          return;
+        }
+        const res = await googleSignInDirect(customClientId.trim());
+        if (res?.accessToken) {
+          setIsGoogleLinked(true);
+          localStorage.setItem("apbd_2026_google_linked", "true");
+          showToast("Berhasil terhubung secara Mandiri!", "success");
+          setTimeout(() => {
+            loadFromSheets();
+          }, 500);
+        }
+      } else {
+        const res = await googleSignIn();
+        if (res) {
+          setGoogleUser(res.user);
+          setIsGoogleLinked(true);
+          localStorage.setItem("apbd_2026_google_linked", "true");
+          showToast("Berhasil terhubung dengan Akun Google!", "success");
+          // Start automatic reload from sheets
+          setTimeout(() => {
+            loadFromSheets();
+          }, 500);
+        }
       }
     } catch (err: any) {
       console.error(err);
-      showToast("Tautan Google gagal: " + (err.message || err), "warn");
+      showToast("Tautan Google gagal: " + getFriendlyAuthErrorMessage(err), "warn");
     } finally {
       setIsGoogleSyncLoading(false);
     }
   };
+
+  const handleConnectWithManualToken = async () => {
+    if (!manualAccessToken.trim()) {
+      showToast("Access token manual tidak boleh kosong.", "warn");
+      return;
+    }
+    const cleanToken = manualAccessToken.trim();
+    try {
+      setIsGoogleSyncLoading(true);
+      localStorage.setItem("gdrive_access_token", cleanToken);
+      // Valid for 1 hour
+      localStorage.setItem("gdrive_access_token_expires_at", (Date.now() + 3550 * 1000).toString());
+      localStorage.setItem("apbd_2026_google_linked", "true");
+      setIsGoogleLinked(true);
+      showToast("Berhasil terhubung menggunakan Token Manual!", "success");
+      await loadFromSheets();
+    } catch (err: any) {
+      console.error(err);
+      showToast("Gagal memuat Google Sheets dengan token: " + err.message, "warn");
+    } finally {
+      setIsGoogleSyncLoading(false);
+    }
+  };
+
 
   const handleGoogleLogout = async () => {
     const confirmLogout = window.confirm("Apakah Anda yakin ingin memutuskan tautan Google Sheets & Drive?");
@@ -457,7 +517,7 @@ export default function App() {
       showToast("Folder & Ledger pribadi berhasil dibuat di Google Drive Anda!", "success");
     } catch (err: any) {
       console.error(err);
-      showToast("Gagal menyiapkan Google Drive pribadi: " + err.message, "warn");
+      showToast("Gagal menyiapkan Google Drive pribadi: " + getFriendlyAuthErrorMessage(err), "warn");
     } finally {
       setIsGoogleSyncLoading(false);
     }
@@ -506,7 +566,7 @@ export default function App() {
       showToast("Berhasil terhubung ke Spreadsheet kustom Anda & sinkronisasi selesai!", "success");
     } catch (err: any) {
       console.error(err);
-      showToast("Tautan gagal. Pastikan ID valid & Anda memberi izin akses: " + err.message, "warn");
+      showToast("Tautan gagal: " + getFriendlyAuthErrorMessage(err), "warn");
     } finally {
       setIsGoogleSyncLoading(false);
     }
@@ -2558,14 +2618,115 @@ export default function App() {
                         </button>
                       </div>
                     ) : (
-                      <button
-                        onClick={handleGoogleLogin}
-                        disabled={isGoogleSyncLoading}
-                        className="w-full px-3 py-2 flex items-center justify-center gap-2 rounded-lg text-[10px] font-black uppercase tracking-wider bg-[#818cf8] hover:bg-indigo-600 text-white shadow-lg shadow-indigo-500/10 transition-colors cursor-pointer"
-                      >
-                        <Globe className="w-3 h-3 text-white" />
-                        <span>Koneksi Google Cloud</span>
-                      </button>
+                      <div className="space-y-2.5 border-t border-dashed border-slate-500/10 pt-2.5">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[9px] uppercase font-black tracking-wider text-slate-400">Metode Otorisasi:</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const newMode = !useCustomAuth;
+                              setUseCustomAuth(newMode);
+                              localStorage.setItem("google_custom_auth_active", String(newMode));
+                            }}
+                            className={`px-1.5 py-0.5 rounded text-[8px] font-bold uppercase transition-colors cursor-pointer ${
+                              useCustomAuth 
+                                ? "bg-amber-500/10 text-amber-400 border border-amber-500/20" 
+                                : "bg-blue-500/10 text-blue-400 border border-blue-500/20"
+                            }`}
+                          >
+                            {useCustomAuth ? "INDIVIDUAL (MANUAL)" : "SYSTEM AUTO (FIREBASE)"}
+                          </button>
+                        </div>
+
+                        {useCustomAuth ? (
+                          <div className="p-2.5 bg-slate-500/5 border border-slate-500/10 rounded-lg space-y-2.5 text-[10px]">
+                            <div className="text-[8.5px] leading-relaxed text-slate-400">
+                              <strong className="text-amber-400 font-bold block mb-0.5">💡 SOLUSI INDIVIDUAL (UNTUK VERCEL)</strong>
+                              Metode kustom ini memintas Firebase Auth sehingga Anda bisa mensinkronkan data di domain kustom Anda (seperti Vercel) tanpa takut error <i>unauthorized-domain</i>!
+                            </div>
+
+                            {/* Option A: Client ID */}
+                            <div className="space-y-1.5 border-t border-slate-500/10 pt-1.5">
+                              <label className="text-[8.5px] uppercase font-black text-slate-400 block">1. Pakai Client ID Google Kustom:</label>
+                              <input
+                                type="text"
+                                value={customClientId}
+                                onChange={(e) => {
+                                  setCustomClientId(e.target.value);
+                                  localStorage.setItem("google_custom_client_id", e.target.value);
+                                }}
+                                placeholder="Masukkan Client ID Anda (45447406...)"
+                                className="w-full px-2 py-1 text-[10px] font-mono rounded bg-slate-900 border border-slate-500/20 text-slate-200 placeholder-slate-600 focus:outline-none focus:border-amber-400"
+                              />
+                              <button
+                                type="button"
+                                onClick={handleGoogleLogin}
+                                disabled={isGoogleSyncLoading}
+                                className="w-full px-2 py-1 flex items-center justify-center gap-1.5 rounded bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold uppercase text-[9px] tracking-wide transition-colors cursor-pointer"
+                              >
+                                <Key size={10} />
+                                <span>Login via Google Pop Up</span>
+                              </button>
+                              <p className="text-[8px] text-slate-500 leading-normal">
+                                Dapatkan Client ID dari Google Cloud Console. Daftarkan URL Vercel Anda di "Authorized Javascript Origins" & "Redirect URIs" pada Client ID tersebut.
+                              </p>
+                            </div>
+
+                            {/* Divider */}
+                            <div className="relative flex items-center justify-center my-1.5">
+                              <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-dashed border-slate-500/10"></div></div>
+                              <span className="relative px-2 bg-slate-900 border border-slate-500/10 rounded text-[7.5px] uppercase font-bold text-slate-500">Atau</span>
+                            </div>
+
+                            {/* Option B: Manual Access Token */}
+                            <div className="space-y-1.5">
+                              <label className="text-[8.5px] uppercase font-black text-slate-400 block">2. Pakai Access Token Instan:</label>
+                              <div className="flex gap-1.5">
+                                <input
+                                  type="password"
+                                  value={manualAccessToken}
+                                  onChange={(e) => setManualAccessToken(e.target.value)}
+                                  placeholder="Tempel Token (ya29.a0A...)"
+                                  className="flex-1 min-w-0 px-2 py-1 text-[10px] font-mono rounded bg-slate-900 border border-slate-500/20 text-slate-200 placeholder-slate-600 focus:outline-none focus:border-amber-400"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={handleConnectWithManualToken}
+                                  disabled={isGoogleSyncLoading}
+                                  className="px-2 py-1 text-[9px] font-bold uppercase rounded bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white transition-colors cursor-pointer shrink-0"
+                                >
+                                  Terapkan
+                                </button>
+                              </div>
+                              <p className="text-[8px] text-slate-550 leading-normal">
+                                Ambil Token Instan 1 jam dari Google OAuth Playground (pilih scope Drive & Sheets). Paling praktis karena 100% tanpa setup console apa pun!
+                              </p>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="space-y-1.5">
+                            <button
+                              type="button"
+                              onClick={handleGoogleLogin}
+                              disabled={isGoogleSyncLoading}
+                              className="w-full px-3 py-2 flex items-center justify-center gap-2 rounded-lg text-[10px] font-black uppercase tracking-wider bg-[#818cf8] hover:bg-indigo-600 text-white shadow-lg shadow-indigo-500/10 transition-colors cursor-pointer"
+                            >
+                              <Globe className="w-3 h-3 text-white" />
+                              <span>Koneksi Google Cloud</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setUseCustomAuth(true);
+                                localStorage.setItem("google_custom_auth_active", "true");
+                              }}
+                              className="w-full text-center text-[8.5px] text-slate-500 hover:text-amber-405 hover:underline cursor-pointer transition-colors block py-0.5"
+                            >
+                              ⚠️ Error domain (Vercel)? Klik untuk Login Mandiri (Firebase-Free)
+                            </button>
+                          </div>
+                        )}
+                      </div>
                     )}
                   </div>
 

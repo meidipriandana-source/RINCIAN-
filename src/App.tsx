@@ -67,7 +67,10 @@ import {
   saveAllDataToGoogleSheets,
   loadAllDataFromGoogleSheets,
   FOLDER_ID,
-  SPREADSHEET_ID
+  SPREADSHEET_ID,
+  createPersonalWorkspace,
+  updateWorkspaceConfig,
+  resetWorkspaceConfig
 } from "./googleWorkspace";
 import { saveToDB, loadFromDB } from "./indexedDB";
 
@@ -104,6 +107,8 @@ export default function App() {
     }
   });
 
+  const [isDbLoaded, setIsDbLoaded] = useState(false);
+
   const emptyMonths = useMemo(() => {
     const monthsWithTxs = new Set(transactions.map((tx) => tx.month));
     return Array.from({ length: 12 }).map((_, mIdx) => !monthsWithTxs.has(mIdx + 1));
@@ -119,6 +124,15 @@ export default function App() {
   const [isGoogleSyncLoading, setIsGoogleSyncLoading] = useState(false);
   const [isSheetLoaded, setIsSheetLoaded] = useState(false);
   const [googleSyncError, setGoogleSyncError] = useState<string | null>(null);
+
+  const [currentSpreadsheetId, setCurrentSpreadsheetId] = useState(SPREADSHEET_ID);
+  const [currentFolderId, setCurrentFolderId] = useState(FOLDER_ID);
+  const [isCustomWorkspaceActive, setIsCustomWorkspaceActive] = useState(() => {
+    return !!localStorage.getItem("custom_apbd_spreadsheet_id");
+  });
+  const [customSheetInput, setCustomSheetInput] = useState(() => {
+    return localStorage.getItem("custom_apbd_spreadsheet_id") || "";
+  });
 
   // --- LOCAL BACKUP & RESTORE STATES ---
   const [isRestoreModalOpen, setIsRestoreModalOpen] = useState(false);
@@ -146,12 +160,15 @@ export default function App() {
         }
       } catch (e) {
         console.error("Gagal melakukan restorasi startup dari IndexedDB:", e);
+      } finally {
+        setIsDbLoaded(true);
       }
     };
     initDatabaseState();
   }, []);
 
   useEffect(() => {
+    if (!isDbLoaded) return;
     try {
       localStorage.setItem("apbd_2026_categories", JSON.stringify(categories));
     } catch (e) {
@@ -159,10 +176,11 @@ export default function App() {
     }
     // Always persist to IndexedDB asynchronously
     saveToDB("apbd_2026_categories", categories);
-  }, [categories]);
+  }, [categories, isDbLoaded]);
 
   // Sync state with verified offline/PDF baseline for key budgets (including Honorarium & Makan-Minum division)
   useEffect(() => {
+    if (!isDbLoaded) return;
     try {
       let corrected = false;
       const verifiedCategories = categories.map((cat) => {
@@ -211,9 +229,10 @@ export default function App() {
     } catch (e) {
       console.error("Gagal melakukan sinkronisasi baseline:", e);
     }
-  }, []);
+  }, [categories, isDbLoaded]);
 
   useEffect(() => {
+    if (!isDbLoaded) return;
     try {
       localStorage.setItem("apbd_2026_transactions", JSON.stringify(transactions));
     } catch (e) {
@@ -222,7 +241,7 @@ export default function App() {
     }
     // Always persist to IndexedDB asynchronously (handles hundreds of MBs seamlessly)
     saveToDB("apbd_2026_transactions", transactions);
-  }, [transactions]);
+  }, [transactions, isDbLoaded]);
 
   // --- THEME STATE ---
   const [themeSetting, setThemeSetting] = useState<"system" | "light" | "dark" | "navy" | "contrast">(() => {
@@ -397,12 +416,99 @@ export default function App() {
     if (!confirmLogout) return;
     try {
       await logout();
+      resetWorkspaceConfig();
+      setCurrentSpreadsheetId(SPREADSHEET_ID);
+      setCurrentFolderId(FOLDER_ID);
+      setIsCustomWorkspaceActive(false);
       setGoogleUser(null);
       setIsGoogleLinked(false);
       setIsSheetLoaded(false);
       showToast("Tautan Google diputuskan. Data kembali disimpan lokal.", "info");
     } catch (err) {
       console.error(err);
+    }
+  };
+
+  const handleCreatePersonalWorkspace = async () => {
+    try {
+      setIsGoogleSyncLoading(true);
+      
+      // Ensure the user is authenticated with Google and has a token
+      let token = getCachedToken();
+      if (!token) {
+        showToast("Menghubungkan ke Akun Google Anda terlebih dahulu...", "info");
+        const loginRes = await googleSignIn();
+        if (!loginRes) {
+          showToast("Gagal menghubungkan Akun Google.", "warn");
+          return;
+        }
+        setGoogleUser(loginRes.user);
+        setIsGoogleLinked(true);
+        localStorage.setItem("apbd_2026_google_linked", "true");
+        token = loginRes.accessToken;
+      }
+
+      showToast("Sedang menyiapkan RKA & Ledger pribadi di Google Drive Anda...", "info");
+      const res = await createPersonalWorkspace(categories, transactions);
+      setCurrentSpreadsheetId(res.spreadsheetId);
+      setCurrentFolderId(res.folderId);
+      setIsCustomWorkspaceActive(true);
+      setIsSheetLoaded(true);
+      showToast("Folder & Ledger pribadi berhasil dibuat di Google Drive Anda!", "success");
+    } catch (err: any) {
+      console.error(err);
+      showToast("Gagal menyiapkan Google Drive pribadi: " + err.message, "warn");
+    } finally {
+      setIsGoogleSyncLoading(false);
+    }
+  };
+
+  const handleResetToSharedWorkspace = () => {
+    resetWorkspaceConfig();
+    setCurrentSpreadsheetId(SPREADSHEET_ID);
+    setCurrentFolderId(FOLDER_ID);
+    setIsCustomWorkspaceActive(false);
+    setCustomSheetInput("");
+    showToast("Berhasil dialihkan kembali ke Ledger Sistem Bersama.", "success");
+  };
+
+  const handleSaveCustomSpreadsheetId = async () => {
+    if (!customSheetInput.trim()) {
+      showToast("ID Spreadsheet tidak boleh kosong.", "warn");
+      return;
+    }
+    const cleanId = customSheetInput.trim();
+    try {
+      setIsGoogleSyncLoading(true);
+      
+      // Ensure the user is authenticated with Google and has a token
+      let token = getCachedToken();
+      if (!token) {
+        showToast("Menghubungkan ke Akun Google Anda terlebih dahulu...", "info");
+        const loginRes = await googleSignIn();
+        if (!loginRes) {
+          showToast("Gagal menghubungkan Akun Google.", "warn");
+          return;
+        }
+        setGoogleUser(loginRes.user);
+        setIsGoogleLinked(true);
+        localStorage.setItem("apbd_2026_google_linked", "true");
+        token = loginRes.accessToken;
+      }
+
+      showToast("Menghubungkan ke Spreadsheet kustom Anda dan mendownload data...", "info");
+      updateWorkspaceConfig(cleanId, FOLDER_ID);
+      setCurrentSpreadsheetId(cleanId);
+      setIsCustomWorkspaceActive(true);
+      
+      // Re-trigger auth sync with new config
+      await loadFromSheets();
+      showToast("Berhasil terhubung ke Spreadsheet kustom Anda & sinkronisasi selesai!", "success");
+    } catch (err: any) {
+      console.error(err);
+      showToast("Tautan gagal. Pastikan ID valid & Anda memberi izin akses: " + err.message, "warn");
+    } finally {
+      setIsGoogleSyncLoading(false);
     }
   };
 
@@ -418,6 +524,8 @@ export default function App() {
       () => {
         // Not configured or session expired
         setGoogleUser(null);
+        setIsGoogleLinked(false);
+        localStorage.removeItem("apbd_2026_google_linked");
       }
     );
     return () => unsubscribe();
@@ -2362,14 +2470,69 @@ export default function App() {
                   </div>
 
                   {isGoogleLinked && (
-                    <div className="space-y-1.5 text-left border-t border-dashed border-slate-500/15 pt-2 text-[10px] font-mono select-all">
-                      <div className="flex items-center gap-1.5 truncate">
-                        <FileSpreadsheet size={11} className="text-emerald-500 shrink-0" />
-                        <a href={`https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/edit`} target="_blank" referrerPolicy="no-referrer" className="truncate hover:underline text-[#818cf8]">{SPREADSHEET_ID}</a>
+                    <div className="space-y-3 border-t border-dashed border-slate-500/15 pt-2">
+                      <div className="space-y-1">
+                        <span className="text-[9px] uppercase font-bold text-slate-500">Penyimpanan Workspace:</span>
+                        <div className={`p-1.5 rounded-lg border text-[10px] font-bold ${isCustomWorkspaceActive ? 'bg-emerald-500/5 border-emerald-500/20 text-emerald-400' : 'bg-blue-500/5 border-blue-500/20 text-blue-400'}`}>
+                          {isCustomWorkspaceActive ? "🟢 Drive Pribadi (LPJ & PDF Aman)" : "🔵 Sistem Bersama (Demo/Publik)"}
+                        </div>
                       </div>
-                      <div className="flex items-center gap-1.5 truncate">
-                        <FolderOpen size={11} className="text-indigo-400 shrink-0" />
-                        <a href={`https://drive.google.com/drive/folders/${FOLDER_ID}`} target="_blank" referrerPolicy="no-referrer" className="truncate hover:underline text-[#818cf8]">{FOLDER_ID}</a>
+
+                      <div className="space-y-1.5 text-left text-[10px] font-mono select-all">
+                        <div className="flex items-center gap-1.5 truncate">
+                          <FileSpreadsheet size={11} className="text-emerald-500 shrink-0" />
+                          <a href={`https://docs.google.com/spreadsheets/d/${currentSpreadsheetId}/edit`} target="_blank" referrerPolicy="no-referrer" className="truncate hover:underline text-[#818cf8]">{currentSpreadsheetId}</a>
+                        </div>
+                        <div className="flex items-center gap-1.5 truncate">
+                          <FolderOpen size={11} className="text-indigo-400 shrink-0" />
+                          <a href={`https://drive.google.com/drive/folders/${currentFolderId}`} target="_blank" referrerPolicy="no-referrer" className="truncate hover:underline text-[#818cf8]">{currentFolderId}</a>
+                        </div>
+                      </div>
+
+                      {/* Custom Spreadsheet ID Input */}
+                      <div className="p-2 border border-slate-500/10 rounded-lg space-y-1.5 bg-slate-500/5">
+                        <span className="text-[9px] uppercase font-black tracking-wider text-slate-400 block">Hubungkan Spreadsheet Kustom:</span>
+                        <div className="flex gap-1">
+                          <input
+                            type="text"
+                            value={customSheetInput}
+                            onChange={(e) => setCustomSheetInput(e.target.value)}
+                            placeholder="Sematkan ID Spreadsheet (1T8Qx...)"
+                            className="flex-1 min-w-0 px-2 py-1 text-[10px] font-mono rounded bg-slate-900 border border-slate-500/20 text-slate-200 placeholder-slate-605 focus:outline-none focus:border-[#818cf8]"
+                          />
+                          <button
+                            onClick={handleSaveCustomSpreadsheetId}
+                            disabled={isGoogleSyncLoading}
+                            className="px-2 py-1 text-[9px] font-bold uppercase rounded bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white transition-colors cursor-pointer shrink-0"
+                          >
+                            Hubungkan
+                          </button>
+                        </div>
+                        <p className="text-[8px] text-slate-500 font-sans leading-normal">
+                          Gunakan ID Spreadsheet Anda sendiri untuk hak milik & kontrol penuh data PDF dan LPJ.
+                        </p>
+                      </div>
+
+                      <div className="flex flex-col gap-1.5 border-t border-dashed border-slate-500/15 pt-2">
+                        {!isCustomWorkspaceActive ? (
+                          <button
+                            onClick={handleCreatePersonalWorkspace}
+                            disabled={isGoogleSyncLoading}
+                            className="w-full px-2 py-1.5 flex items-center justify-center gap-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider bg-indigo-600 hover:bg-indigo-700 text-white shadow-md transition-colors cursor-pointer"
+                          >
+                            <Cloud size={11} className="animate-pulse" />
+                            <span>Buat Folder & Sheets Pribadi</span>
+                          </button>
+                        ) : (
+                          <button
+                            onClick={handleResetToSharedWorkspace}
+                            disabled={isGoogleSyncLoading}
+                            className="w-full px-2 py-1.5 flex items-center justify-center gap-1.5 rounded-lg text-[9px] font-bold uppercase tracking-wider border border-slate-500/30 bg-slate-500/5 hover:bg-slate-500/15 text-slate-300 transition-colors cursor-pointer"
+                          >
+                            <RotateCcw size={11} />
+                            <span>Kembalikan ke Sistem Bersama</span>
+                          </button>
+                        )}
                       </div>
                     </div>
                   )}

@@ -17,8 +17,44 @@ const provider = new GoogleAuthProvider();
 provider.addScope("https://www.googleapis.com/auth/spreadsheets");
 provider.addScope("https://www.googleapis.com/auth/drive");
 
-export const FOLDER_ID = "1AJcP2TAvDYghh0kb21ZUQ_ou0WeW3B7k";
-export const SPREADSHEET_ID = "1-gVQc5jKDzJaBgDCuOvx7khD9NS9839j";
+export let FOLDER_ID = "1AJcP2TAvDYghh0kb21ZUQ_ou0WeW3B7k";
+export let SPREADSHEET_ID = "1-gVQc5jKDzJaBgDCuOvx7khD9NS9839j";
+
+// Custom Google Drive credentials loading
+try {
+  const customSheet = localStorage.getItem("custom_apbd_spreadsheet_id");
+  if (customSheet) {
+    SPREADSHEET_ID = customSheet;
+  }
+  const customFolder = localStorage.getItem("custom_apbd_folder_id");
+  if (customFolder) {
+    FOLDER_ID = customFolder;
+  }
+} catch (e) {
+  console.error("Gagal membaca ID custom dari localStorage", e);
+}
+
+export function updateWorkspaceConfig(sheetId: string, folderId: string) {
+  SPREADSHEET_ID = sheetId;
+  FOLDER_ID = folderId;
+  try {
+    localStorage.setItem("custom_apbd_spreadsheet_id", sheetId);
+    localStorage.setItem("custom_apbd_folder_id", folderId);
+  } catch (e) {
+    console.error("Gagal menulis ID custom ke localStorage", e);
+  }
+}
+
+export function resetWorkspaceConfig() {
+  SPREADSHEET_ID = "1-gVQc5jKDzJaBgDCuOvx7khD9NS9839j";
+  FOLDER_ID = "1AJcP2TAvDYghh0kb21ZUQ_ou0WeW3B7k";
+  try {
+    localStorage.removeItem("custom_apbd_spreadsheet_id");
+    localStorage.removeItem("custom_apbd_folder_id");
+  } catch (e) {
+    console.error("Gagal menghapus ID custom dari localStorage", e);
+  }
+}
 
 let cachedAccessToken: string | null = null;
 try {
@@ -398,3 +434,74 @@ export async function loadAllDataFromGoogleSheets(): Promise<{
     transactions: loadedTransactions
   };
 }
+
+/**
+ * GOOGLE DRIVE & SHEETS - Create Private User Folder & Spreadsheet
+ */
+export async function createPersonalWorkspace(
+  categories: BudgetCategory[],
+  transactions: RealisasiTransaction[]
+): Promise<{ spreadsheetId: string; folderId: string }> {
+  const token = cachedAccessToken;
+  if (!token) {
+    throw new Error("Lakukan login Google terlebih dahulu.");
+  }
+
+  // 1. Create a Folder named "APBD Tarakan 2026 - LPJ & Realisasi" on the user's own Drive
+  const folderMetadata = {
+    name: "APBD Tarakan 2026 - LPJ & Realisasi",
+    mimeType: "application/vnd.google-apps.folder"
+  };
+
+  const folderRes = await fetch("https://www.googleapis.com/drive/v3/files", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(folderMetadata)
+  });
+
+  if (!folderRes.ok) {
+    const errText = await folderRes.text();
+    console.error("Folder creation failed:", errText);
+    throw new Error(`Gagal membuat Folder Google Drive: ${folderRes.statusText}`);
+  }
+
+  const folderData = await folderRes.json();
+  const newFolderId = folderData.id;
+
+  // 2. Create a Spreadsheet named "APBD Tarakan 2026 - Ledger Realisasi" inside that Folder
+  const sheetMetadata = {
+    name: "APBD Tarakan 2026 - Ledger Realisasi",
+    mimeType: "application/vnd.google-apps.spreadsheet",
+    parents: [newFolderId]
+  };
+
+  const sheetRes = await fetch("https://www.googleapis.com/drive/v3/files", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(sheetMetadata)
+  });
+
+  if (!sheetRes.ok) {
+    const errText = await sheetRes.text();
+    console.error("Sheet creation failed:", errText);
+    throw new Error(`Gagal membuat Spreadsheet Google Sheets: ${sheetRes.statusText}`);
+  }
+
+  const sheetData = await sheetRes.json();
+  const newSpreadsheetId = sheetData.id;
+
+  // Update configurations dynamically
+  updateWorkspaceConfig(newSpreadsheetId, newFolderId);
+
+  // 3. Immediately initialize and upload current local state to the new spreadsheet
+  await saveAllDataToGoogleSheets(categories, transactions);
+
+  return { spreadsheetId: newSpreadsheetId, folderId: newFolderId };
+}
+

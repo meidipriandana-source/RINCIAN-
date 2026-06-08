@@ -1405,7 +1405,7 @@ export default function App() {
       doc.setFontSize(10);
       doc.setTextColor(50, 60, 70);
       doc.text("Kode", 17, y + 5.5);
-      doc.text("Nama Kategori Program Belanja", 45, y + 5.5);
+      doc.text("Nama Kategori Program Belanja", 58, y + 5.5);
       doc.text("Rencana (IDR)", 235, y + 5.5);
       
       const relisasiLabelMain = isMonthly ? `Realisasi ${getShortMonthName(selectedMonthFilter as number)} (IDR)` : "Realisasi (IDR)";
@@ -1442,7 +1442,7 @@ export default function App() {
         }
 
         doc.text(cat.kode, 17, y + 5.5);
-        doc.text(shortenedName, 45, y + 5.5);
+        doc.text(shortenedName, 58, y + 5.5);
         doc.text(catRencana.toLocaleString("id-ID"), 235, y + 5.5);
         doc.text(catSpent.toLocaleString("id-ID"), 270, y + 5.5);
         doc.text(catSisa.toLocaleString("id-ID"), 305, y + 5.5);
@@ -1652,7 +1652,7 @@ export default function App() {
       doc.setTextColor(50, 60, 70);
       doc.text("No", 17, y + 5.5);
       doc.text("Kode Rekening", 23, y + 5.5);
-      doc.text("Nama Kategori Program Belanja", 53, y + 5.5);
+      doc.text("Nama Kategori Program Belanja", 66, y + 5.5);
       doc.text("Pagu Rencana (IDR)", 190, y + 5.5);
       doc.text("Total Realisasi (IDR)", 230, y + 5.5);
       doc.text("Sisa Anggaran (IDR)", 270, y + 5.5);
@@ -1683,7 +1683,7 @@ export default function App() {
 
         doc.text(idxSum.toString(), 17, y + 5.5);
         doc.text(cat.kode, 23, y + 5.5);
-        doc.text(shortenedName, 53, y + 5.5);
+        doc.text(shortenedName, 66, y + 5.5);
         doc.text(catRencana.toLocaleString("id-ID"), 190, y + 5.5);
         doc.text(catSpent.toLocaleString("id-ID"), 230, y + 5.5);
         doc.text(catSisa.toLocaleString("id-ID"), 270, y + 5.5);

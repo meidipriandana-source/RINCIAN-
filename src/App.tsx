@@ -145,7 +145,12 @@ export default function App() {
     return localStorage.getItem("google_custom_client_id") || "";
   });
   const [manualAccessToken, setManualAccessToken] = useState("");
+  const [customFirebaseConfigInput, setCustomFirebaseConfigInput] = useState(() => {
+    return localStorage.getItem("google_custom_firebase_config_input") || "";
+  });
   const [showAdvancedAuthOptions, setShowAdvancedAuthOptions] = useState(false);
+  const [copiedOrigin, setCopiedOrigin] = useState(false);
+  const [activeHelpSection, setActiveHelpSection] = useState<string | null>(null);
 
 
   // --- LOCAL BACKUP & RESTORE STATES ---
@@ -451,6 +456,54 @@ export default function App() {
     } finally {
       setIsGoogleSyncLoading(false);
     }
+  };
+
+  const handleSaveCustomFirebaseConfig = () => {
+    const rawInput = customFirebaseConfigInput.trim();
+    if (!rawInput) {
+      localStorage.removeItem("google_custom_firebase_config_input");
+      localStorage.removeItem("google_custom_firebase_config");
+      showToast("Konfigurasi Firebase kustom dihapus. Menggunakan setelan bawaan.", "success");
+      setTimeout(() => {
+        window.location.reload();
+      }, 1500);
+      return;
+    }
+
+    let parsed: any = null;
+    try {
+      parsed = JSON.parse(rawInput);
+    } catch (e) {
+      const apiKeyMatch = rawInput.match(/apiKey:\s*["']([^"']+)["']/);
+      const authDomainMatch = rawInput.match(/authDomain:\s*["']([^"']+)["']/);
+      const projectIdMatch = rawInput.match(/projectId:\s*["']([^"']+)["']/);
+      const storageBucketMatch = rawInput.match(/storageBucket:\s*["']([^"']+)["']/);
+      const messagingSenderIdMatch = rawInput.match(/messagingSenderId:\s*["']([^"']+)["']/);
+      const appIdMatch = rawInput.match(/appId:\s*["']([^"']+)["']/);
+
+      if (apiKeyMatch && authDomainMatch && projectIdMatch) {
+        parsed = {
+          apiKey: apiKeyMatch[1],
+          authDomain: authDomainMatch[1],
+          projectId: projectIdMatch[1],
+          storageBucket: storageBucketMatch ? storageBucketMatch[1] : "",
+          messagingSenderId: messagingSenderIdMatch ? messagingSenderIdMatch[1] : "",
+          appId: appIdMatch ? appIdMatch[1] : ""
+        };
+      }
+    }
+
+    if (!parsed || !parsed.apiKey || !parsed.authDomain || !parsed.projectId) {
+      showToast("Khusus Firebase Config: Format tidak valid! Harap pastikan ada apiKey, authDomain, dan projectId.", "warn");
+      return;
+    }
+
+    localStorage.setItem("google_custom_firebase_config_input", rawInput);
+    localStorage.setItem("google_custom_firebase_config", JSON.stringify(parsed));
+    showToast("Firebase Config kustom berhasil disimpan! Memuat ulang...", "success");
+    setTimeout(() => {
+      window.location.reload();
+    }, 1500);
   };
 
 
@@ -2601,101 +2654,24 @@ export default function App() {
                         </button>
                       </div>
                     ) : (
-                      <div className="space-y-2.5 border-t border-dashed border-slate-500/10 pt-2.5">
-                        <div className="flex items-center justify-between">
-                          <span className="text-[9px] uppercase font-black tracking-wider text-slate-400">Metode Otorisasi:</span>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const newMode = !useCustomAuth;
-                              setUseCustomAuth(newMode);
-                              localStorage.setItem("google_custom_auth_active", String(newMode));
-                            }}
-                            className={`px-1.5 py-0.5 rounded text-[8px] font-bold uppercase transition-colors cursor-pointer ${
-                              useCustomAuth 
-                                ? "bg-amber-500/10 text-amber-400 border border-amber-500/20" 
-                                : "bg-blue-500/10 text-blue-400 border border-blue-500/20"
-                            }`}
-                          >
-                            {useCustomAuth ? "INDIVIDUAL (MANUAL)" : "SYSTEM AUTO (FIREBASE)"}
-                          </button>
-                        </div>
-
-                        {useCustomAuth ? (
-                          <div className="p-2.5 bg-slate-500/5 border border-slate-500/10 rounded-lg space-y-2.5 text-[10px]">
-                            <div className="text-[8.5px] leading-relaxed text-slate-400">
-                              <strong className="text-amber-400 font-bold block mb-0.5">💡 SOLUSI INDIVIDUAL (UNTUK VERCEL)</strong>
-                              Metode kustom ini memintas Firebase Auth sehingga Anda bisa mensinkronkan data di domain kustom Anda (seperti Vercel) tanpa takut error <i>unauthorized-domain</i>!
-                            </div>
-
-                            {/* Option A: Client ID */}
-                            <div className="space-y-1.5 border-t border-slate-500/10 pt-1.5">
-                              <label className="text-[8.5px] uppercase font-black text-slate-400 block">1. Pakai Client ID Google Kustom:</label>
-                              <input
-                                type="text"
-                                value={customClientId}
-                                onChange={(e) => {
-                                  setCustomClientId(e.target.value);
-                                  localStorage.setItem("google_custom_client_id", e.target.value);
-                                }}
-                                placeholder="Masukkan Client ID Anda (45447406...)"
-                                className="w-full px-2 py-1 text-[10px] font-mono rounded bg-slate-900 border border-slate-500/20 text-slate-200 placeholder-slate-600 focus:outline-none focus:border-amber-400"
-                              />
-                              <button
-                                type="button"
-                                onClick={handleGoogleLogin}
-                                disabled={isGoogleSyncLoading}
-                                className="w-full px-2 py-1 flex items-center justify-center gap-1.5 rounded bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold uppercase text-[9px] tracking-wide transition-colors cursor-pointer"
-                              >
-                                <Key size={10} />
-                                <span>Login via Google Pop Up</span>
-                              </button>
-                              <p className="text-[8px] text-slate-500 leading-normal">
-                                Dapatkan Client ID dari Google Cloud Console. Daftarkan URL Vercel Anda di "Authorized Javascript Origins" & "Redirect URIs" pada Client ID tersebut.
-                              </p>
-                            </div>
-
-                            {/* Divider */}
-                            <div className="relative flex items-center justify-center my-1.5">
-                              <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-dashed border-slate-500/10"></div></div>
-                              <span className="relative px-2 bg-slate-900 border border-slate-500/10 rounded text-[7.5px] uppercase font-bold text-slate-500">Atau</span>
-                            </div>
-
-                            {/* Option B: Manual Access Token */}
-                            <div className="space-y-1.5">
-                              <label className="text-[8.5px] uppercase font-black text-slate-400 block">2. Pakai Access Token Instan:</label>
-                              <div className="flex gap-1.5">
-                                <input
-                                  type="password"
-                                  value={manualAccessToken}
-                                  onChange={(e) => setManualAccessToken(e.target.value)}
-                                  placeholder="Tempel Token (ya29.a0A...)"
-                                  className="flex-1 min-w-0 px-2 py-1 text-[10px] font-mono rounded bg-slate-900 border border-slate-500/20 text-slate-200 placeholder-slate-600 focus:outline-none focus:border-amber-400"
-                                />
-                                <button
-                                  type="button"
-                                  onClick={handleConnectWithManualToken}
-                                  disabled={isGoogleSyncLoading}
-                                  className="px-2 py-1 text-[9px] font-bold uppercase rounded bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white transition-colors cursor-pointer shrink-0"
-                                >
-                                  Terapkan
-                                </button>
-                              </div>
-                              <p className="text-[8px] text-slate-550 leading-normal">
-                                Ambil Token Instan 1 jam dari Google OAuth Playground (pilih scope Drive & Sheets). Paling praktis karena 100% tanpa setup console apa pun!
-                              </p>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="space-y-1.5">
+                      <div className="space-y-3.5 border-t border-dashed border-slate-500/10 pt-3">
+                        {/* Selector Tab */}
+                        <div className="flex flex-col gap-1.5 pb-1">
+                          <label className="text-[9px] uppercase font-black tracking-wider text-slate-400 block">Metode Koneksi Google:</label>
+                          <div className="grid grid-cols-2 gap-1.5">
                             <button
                               type="button"
-                              onClick={handleGoogleLogin}
-                              disabled={isGoogleSyncLoading}
-                              className="w-full px-3 py-2 flex items-center justify-center gap-2 rounded-lg text-[10px] font-black uppercase tracking-wider bg-[#818cf8] hover:bg-indigo-600 text-white shadow-lg shadow-indigo-500/10 transition-colors cursor-pointer"
+                              onClick={() => {
+                                setUseCustomAuth(false);
+                                localStorage.setItem("google_custom_auth_active", "false");
+                              }}
+                              className={`py-1.5 rounded-lg text-[9px] font-bold uppercase transition-all tracking-wider ${
+                                !useCustomAuth 
+                                  ? "bg-indigo-500/15 text-indigo-400 border border-indigo-500/35 font-extrabold" 
+                                  : "bg-slate-500/5 hover:bg-slate-500/10 text-slate-400 border border-transparent font-medium cursor-pointer"
+                              }`}
                             >
-                              <Globe className="w-3 h-3 text-white" />
-                              <span>Koneksi Google Cloud</span>
+                              🚀 Auto Firebase
                             </button>
                             <button
                               type="button"
@@ -2703,10 +2679,315 @@ export default function App() {
                                 setUseCustomAuth(true);
                                 localStorage.setItem("google_custom_auth_active", "true");
                               }}
-                              className="w-full text-center text-[8.5px] text-slate-500 hover:text-amber-405 hover:underline cursor-pointer transition-colors block py-0.5"
+                              className={`py-1.5 rounded-lg text-[9px] font-bold uppercase transition-all tracking-wider ${
+                                useCustomAuth 
+                                  ? "bg-amber-500/15 text-amber-400 border border-amber-500/35 font-extrabold" 
+                                  : "bg-slate-500/5 hover:bg-slate-500/10 text-slate-400 border border-transparent font-medium cursor-pointer"
+                              }`}
                             >
-                              ⚠️ Error domain (Vercel)? Klik untuk Login Mandiri (Firebase-Free)
+                              ⚙️ Custom (Mandiri)
                             </button>
+                          </div>
+                        </div>
+
+                        {/* CONTENT METODE 1: AUTO FIREBASE */}
+                        {!useCustomAuth && (
+                          <div className="space-y-3">
+                            <button
+                              type="button"
+                              onClick={handleGoogleLogin}
+                              disabled={isGoogleSyncLoading}
+                              className="w-full px-3 py-2 flex items-center justify-center gap-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider bg-indigo-500 hover:bg-indigo-650 disabled:bg-indigo-900 text-white shadow-lg transition-colors cursor-pointer"
+                            >
+                              <Globe className="w-3.5 h-3.5 text-white" />
+                              <span>{isGoogleSyncLoading ? "Menghubungkan..." : "Hubungkan Google Cloud"}</span>
+                            </button>
+
+                            {/* Vercel domain authorization help card */}
+                            <div className="p-2.5 bg-rose-500/5 border border-rose-500/20 rounded-lg text-[10.5px] text-slate-300 space-y-2">
+                              <span className="font-bold text-rose-400 flex items-center gap-1">
+                                <AlertTriangle size={12} className="shrink-0" />
+                                SOLUSI ERROR DOMAIN (di Vercel)
+                              </span>
+                              <p className="text-[10px] leading-relaxed text-slate-450">
+                                Jika setelah mengklik tombol login di atas muncul pop-up error berisi <b className="text-white">"unauthorized-domain"</b>, Anda hanya perlu mendaftarkan domain Vercel ini di Firebase Console Anda:
+                              </p>
+                              
+                              <div className="space-y-1.5 text-[9.5px] bg-black/40 p-2 rounded border border-white/5 font-mono text-slate-200">
+                                <div className="text-[9px] uppercase font-bold text-slate-500">Domain Vercel Anda:</div>
+                                <div className="flex justify-between items-center bg-slate-900 px-1.5 py-1 rounded">
+                                  <span className="break-all select-all text-indigo-300">{window.location.hostname}</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      navigator.clipboard.writeText(window.location.hostname);
+                                      setCopiedOrigin(true);
+                                      setTimeout(() => setCopiedOrigin(false), 2000);
+                                    }}
+                                    className="ml-2 text-[8px] bg-white/10 hover:bg-white/20 active:bg-white/30 px-1 rounded text-white cursor-pointer"
+                                  >
+                                    {copiedOrigin ? "Tersalin!" : "Salin"}
+                                  </button>
+                                </div>
+                              </div>
+
+                              <ol className="list-decimal list-inside text-[9.5px] space-y-1 pl-1 text-slate-400 leading-normal">
+                                <li>Buka <a href="https://console.firebase.google.com/" target="_blank" rel="noreferrer" className="text-indigo-400 hover:underline inline-flex items-center gap-0.5 font-bold">Firebase Console <ExternalLink size={8} /></a>.</li>
+                                <li>Pilih project Anda &gt; menu <b className="text-slate-300">Authentication</b> &gt; tab <b className="text-slate-300">Settings</b>.</li>
+                                <li>Klik menu sidebar <b className="text-slate-300">Authorized Domains</b> di panel Settings tersebut.</li>
+                                <li>Klik tombol <b className="text-indigo-400 font-bold">"Add Domain"</b>, tempel domain di atas, lalu klik Add. Selesai!</li>
+                              </ol>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* CONTENT METODE 2: CUSTOM MANDIRI */}
+                        {useCustomAuth && (
+                          <div className="p-3 bg-slate-500/5 border border-slate-500/10 rounded-lg space-y-3.5 text-[10px]">
+                            {/* Toggleable help tabs */}
+                            <div className="flex gap-1 border-b border-slate-500/10 pb-1.5 flex-wrap">
+                              <button
+                                type="button"
+                                onClick={() => setActiveHelpSection(activeHelpSection === "firebase_config" ? null : "firebase_config")}
+                                className={`px-2 py-0.5 rounded text-[8.5px] font-bold uppercase transition-colors cursor-pointer ${
+                                  activeHelpSection === "firebase_config" 
+                                    ? "bg-rose-500/20 text-rose-300" 
+                                    : "bg-white/5 text-slate-400 hover:text-white"
+                                }`}
+                              >
+                                {activeHelpSection === "firebase_config" ? "❌ Tutup Manual Firebase" : "🔥 Tutorial Firebase Kustom"}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setActiveHelpSection(activeHelpSection === "client_id" ? null : "client_id")}
+                                className={`px-2 py-0.5 rounded text-[8.5px] font-bold uppercase transition-colors cursor-pointer ${
+                                  activeHelpSection === "client_id" 
+                                    ? "bg-amber-500/20 text-amber-300" 
+                                    : "bg-white/5 text-slate-400 hover:text-white"
+                                }`}
+                              >
+                                {activeHelpSection === "client_id" ? "❌ Tutup Manual ID" : "❓ Tutorial Client ID"}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setActiveHelpSection(activeHelpSection === "playground" ? null : "playground")}
+                                className={`px-2 py-0.5 rounded text-[8.5px] font-bold uppercase transition-colors cursor-pointer ${
+                                  activeHelpSection === "playground" 
+                                    ? "bg-indigo-500/20 text-indigo-300" 
+                                    : "bg-white/5 text-slate-400 hover:text-white"
+                                }`}
+                              >
+                                {activeHelpSection === "playground" ? "❌ Tutup Manual Token" : "❓ Tutorial Token Instan"}
+                              </button>
+                            </div>
+
+                            {/* Help Section: Firebase Config */}
+                            {activeHelpSection === "firebase_config" && (
+                              <div className="p-2.5 bg-rose-500/5 border border-rose-500/15 rounded-lg text-[9.5px] text-slate-300 space-y-1.5 leading-normal text-left">
+                                <span className="font-bold text-rose-400 uppercase flex items-center gap-1">
+                                  🔥 Gunakan Firebase Console Anda Sendiri:
+                                </span>
+                                <p className="text-slate-400">
+                                  Cara ini menuntaskan 100% masalah <span className="text-rose-400 font-bold">unauthorized-domain</span> di web Vercel Anda dengan mengarahkan login ke project Firebase milik Anda sendiri:
+                                </p>
+                                <ol className="list-decimal pl-3 space-y-1.5 text-slate-400">
+                                  <li>
+                                    Buka <a href="https://console.firebase.google.com/" target="_blank" rel="noreferrer" className="text-rose-400 hover:underline font-bold inline-flex items-center gap-0.5">Firebase Console <ExternalLink size={8} /></a> &amp; buat sebuah project baru.
+                                  </li>
+                                  <li>Pergi ke <b className="text-white">Authentication</b> &gt; tab <b className="text-white">Sign-in method</b>, klik Add new provider lalu klik <b className="text-white">Google</b> dan aktifkan.</li>
+                                  <li>
+                                    Di bawah tab <b className="text-white">Settings</b> &gt; submenu <b className="text-white">Authorized Domains</b>, tambahkan domain Vercel Anda yang aktif saat ini:
+                                    <div className="flex items-center justify-between bg-black/50 p-1 rounded font-mono mt-0.5 text-[8.5px] select-all">
+                                      <span className="text-rose-300">{window.location.hostname}</span>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          navigator.clipboard.writeText(window.location.hostname);
+                                          setCopiedOrigin(true);
+                                          setTimeout(() => setCopiedOrigin(false), 2000);
+                                        }}
+                                        className="text-[7.5px] bg-white/10 hover:bg-white/10 px-1 rounded text-white ml-2 pointer-events-auto cursor-pointer"
+                                      >
+                                        {copiedOrigin ? "Tersalin!" : "Salin"}
+                                      </button>
+                                    </div>
+                                  </li>
+                                  <li>Buat Aplikasi Web baru di Dashboard project Firebase Anda, lalu salin kode konfigurasi <code className="text-white">firebaseConfig</code> Javascript yang diberikan.</li>
+                                  <li>Tempel konfigurasi tersebut ke kolom input nomor 1 di bawah, lalu klik <b className="text-white">Simpan Config</b>. Halaman akan dimuat ulang otomatis.</li>
+                                </ol>
+                              </div>
+                            )}
+
+                            {/* Help Section: Client ID */}
+                            {activeHelpSection === "client_id" && (
+                              <div className="p-2.5 bg-amber-500/5 border border-amber-500/15 rounded-lg text-[9.5px] text-slate-300 space-y-1.5 leading-normal text-left">
+                                <span className="font-bold text-amber-400 uppercase flex items-center gap-1">
+                                  🧭 Langkah Membuat Google Client ID:
+                                </span>
+                                <ol className="list-decimal pl-3 space-y-1.5 text-slate-400">
+                                  <li>
+                                    Buka <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noreferrer" className="text-amber-400 hover:underline inline-flex items-center gap-0.5 font-bold">Google Cloud Credentials <ExternalLink size={8} /></a>.
+                                  </li>
+                                  <li>Pilih Project yang terhubung &amp; klik <b className="text-white">+ Create Credentials</b> &gt; <b className="text-white">OAuth client ID</b>.</li>
+                                  <li>Pilih Application Type: <b className="text-white">Web application</b> (Aplikasi Web).</li>
+                                  <li>
+                                    Pada bagian <b className="text-amber-400">Authorized JavaScript origins</b>, tambahkan URL aktif Anda:
+                                    <div className="flex items-center justify-between bg-slate-950 p-1.5 rounded mt-1 font-mono text-[8.5px]">
+                                      <span className="break-all select-all text-amber-300">{window.location.origin}</span>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          navigator.clipboard.writeText(window.location.origin);
+                                          setCopiedOrigin(true);
+                                          setTimeout(() => setCopiedOrigin(false), 2000);
+                                        }}
+                                        className="text-[7.5px] bg-white/10 hover:bg-white/20 px-1 py-0.5 rounded text-white ml-2 cursor-pointer"
+                                      >
+                                        {copiedOrigin ? "Tersalin!" : "Salin"}
+                                      </button>
+                                    </div>
+                                  </li>
+                                  <li>
+                                    Pada bagian <b className="text-amber-400">Authorized redirect URIs</b>, wajib tambahkan URL aktif yang sama persis:
+                                    <div className="flex items-center justify-between bg-slate-950 p-1.5 rounded mt-1 font-mono text-[8.5px]">
+                                      <span className="break-all select-all text-amber-300">{window.location.origin}</span>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          navigator.clipboard.writeText(window.location.origin);
+                                          setCopiedOrigin(true);
+                                          setTimeout(() => setCopiedOrigin(false), 2000);
+                                        }}
+                                        className="text-[7.5px] bg-white/10 hover:bg-white/20 px-1 py-0.5 rounded text-white ml-2 cursor-pointer"
+                                      >
+                                        {copiedOrigin ? "Tersalin!" : "Salin"}
+                                      </button>
+                                    </div>
+                                  </li>
+                                  <li>Klik <b className="text-white">Create</b> di pojok bawah.</li>
+                                  <li>Salin string <b className="text-amber-400">Client ID</b> yang berakhiran <code className="text-white">.apps.googleusercontent.com</code> lalu tempel di kolom input nomor 2 di bawah ini.</li>
+                                </ol>
+                              </div>
+                            )}
+
+                            {/* Help Section: Google Playgroud */}
+                            {activeHelpSection === "playground" && (
+                              <div className="p-2.5 bg-indigo-500/5 border border-indigo-500/15 rounded-lg text-[9.5px] text-slate-300 space-y-1.5 leading-normal text-left">
+                                <span className="font-bold text-indigo-400 uppercase flex items-center gap-1">
+                                  ⚡ Langkah Patch Token Instan (100% Tanpa Config):
+                                </span>
+                                <ol className="list-decimal pl-3 space-y-1.5 text-slate-400 font-normal">
+                                  <li>Buka <a href="https://developers.google.com/oauthplayground/" target="_blank" rel="noreferrer" className="text-indigo-400 hover:underline inline-flex items-center gap-0.5 font-bold">OAuth Playground <ExternalLink size={10} /></a>.</li>
+                                  <li>Di panel kiri (Step 1), gulung ke bawah pilih <b className="text-white">Drive API v3</b> &amp; centang <code className="text-indigo-300">.../auth/drive</code>.</li>
+                                  <li>Lalu pilih <b className="text-white">Google Sheets API v4</b> &amp; centang <code className="text-indigo-300">.../auth/spreadsheets</code>.</li>
+                                  <li>Klik tombol biru <b className="text-white">Authorize APIs</b>, login dengan akun Google Anda and klik Izinkan / Allow.</li>
+                                  <li>Setelah kembali ke Playground (Step 2), klik tombol biru <b className="text-white">"Exchange authorization code for tokens"</b>.</li>
+                                  <li>Pada rincian detail token di bawah, salin seluruh string dalam kolom <b className="text-indigo-400">Access Token</b> (string panjang berawalan <code className="text-indigo-300">ya29.a0A...</code>).</li>
+                                  <li>Tempel pada isian input nomor 3 di bawah dan klik "Terapkan". Berhasil!</li>
+                                </ol>
+                                <div className="text-[8px] bg-indigo-500/15 p-1 pt-1.5 text-slate-400 border border-indigo-500/10 rounded">
+                                  <b>💡 Catatan:</b> Token Playground ini berlaku selama 1 jam. Sangat berguna untuk sinkronisasi darurat secara cepat tanpa butuh Google Cloud Console.
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Option 1: Custom Firebase Config */}
+                            <div className="space-y-1.5 border-t border-slate-500/10 pt-2 bg-black/10 p-1.5 rounded border border-white/5 text-left">
+                              <div className="flex items-center justify-between">
+                                <label className="text-[9px] uppercase font-extrabold text-rose-400 block tracking-wider">1. Firebase Web Config Kustom Anda:</label>
+                                {localStorage.getItem("google_custom_firebase_config") && (
+                                  <span className="text-[8px] font-bold text-rose-400 bg-rose-400/15 border border-rose-500/25 px-1 rounded uppercase">Aktif</span>
+                                )}
+                              </div>
+                              <textarea
+                                value={customFirebaseConfigInput}
+                                onChange={(e) => setCustomFirebaseConfigInput(e.target.value)}
+                                placeholder="Tempel kode javascript config dari konsol Firebase Anda, atau format JSON..."
+                                className="w-full h-11 px-2 py-1 flex items-center justify-center gap-1.5 rounded bg-slate-900 border border-slate-500/20 text-slate-200 placeholder-slate-600 focus:outline-none focus:border-rose-400 resize-none font-mono text-[8.5px]"
+                              />
+                              <div className="flex gap-1.5 pt-0.5">
+                                <button
+                                  type="button"
+                                  onClick={handleSaveCustomFirebaseConfig}
+                                  className="flex-1 px-2 py-1 flex items-center justify-center gap-1 rounded bg-rose-500 hover:bg-rose-600 text-white font-extrabold uppercase text-[8.5px] transition-colors cursor-pointer"
+                                >
+                                  Simpan Config
+                                </button>
+                                {localStorage.getItem("google_custom_firebase_config") && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setCustomFirebaseConfigInput("");
+                                      localStorage.removeItem("google_custom_firebase_config_input");
+                                      localStorage.removeItem("google_custom_firebase_config");
+                                      showToast("Firebase Config di-reset ke bawaan! Memuat ulang...", "success");
+                                      setTimeout(() => window.location.reload(), 1500);
+                                    }}
+                                    className="px-2 py-1 rounded bg-slate-900 hover:bg-slate-800 border border-slate-500/25 text-slate-300 font-bold uppercase text-[8.5px] transition-colors cursor-pointer"
+                                  >
+                                    Reset
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Divider line */}
+                            <div className="relative flex items-center justify-center my-1.5">
+                              <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-dashed border-slate-500/15"></div></div>
+                              <span className="relative px-2 bg-[#17181d] text-[7.5px] uppercase font-bold text-slate-500">ATAUPUN</span>
+                            </div>
+
+                            {/* Option 2: Client ID */}
+                            <div className="space-y-1.5 bg-black/10 p-2 rounded border border-white/5 text-left">
+                              <label className="text-[9px] uppercase font-extrabold text-amber-400 block tracking-wider">2. Google Client ID Kustom:</label>
+                              <input
+                                type="text"
+                                value={customClientId}
+                                onChange={(e) => {
+                                  setCustomClientId(e.target.value);
+                                  localStorage.setItem("google_custom_client_id", e.target.value);
+                                }}
+                                placeholder="Masukkan Client ID Anda (...apps.googleusercontent.com)"
+                                className="w-full px-2 py-1.5 text-[9.5px] font-mono rounded bg-slate-900 border border-slate-500/20 text-slate-200 placeholder-slate-600 focus:outline-none focus:border-amber-400"
+                              />
+                              <button
+                                type="button"
+                                onClick={handleGoogleLogin}
+                                disabled={isGoogleSyncLoading}
+                                className="w-full px-2 py-1.5 flex items-center justify-center gap-1.5 rounded bg-amber-500 hover:bg-amber-600 disabled:bg-amber-800 text-slate-950 font-black uppercase text-[9px] tracking-wide transition-colors cursor-pointer"
+                              >
+                                <Key size={10} />
+                                <span>{isGoogleSyncLoading ? "Mencoba Login..." : "Login via Google Pop Up"}</span>
+                              </button>
+                            </div>
+
+                            {/* Divider line */}
+                            <div className="relative flex items-center justify-center my-1.5">
+                              <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-dashed border-slate-500/15"></div></div>
+                              <span className="relative px-2.5 bg-[#17181d] text-[7.5px] uppercase font-bold text-slate-500">ATAUPUN (TEMPORARY FALLBACK)</span>
+                            </div>
+
+                            {/* Option 3: Live Access Token paste */}
+                            <div className="space-y-1.5 bg-black/10 p-2 rounded border border-white/5 text-left">
+                              <label className="text-[9px] uppercase font-extrabold text-indigo-400 block tracking-wider">3. Tempel Access Token Instan:</label>
+                              <div className="flex gap-1.5">
+                                <input
+                                  type="password"
+                                  value={manualAccessToken}
+                                  onChange={(e) => setManualAccessToken(e.target.value)}
+                                  placeholder="Tempel token ya29.a0A..."
+                                  className="flex-1 min-w-0 px-2 py-1.5 text-[9.5px] font-mono rounded bg-slate-900 border border-slate-500/20 text-slate-200 placeholder-slate-600 focus:outline-none focus:border-indigo-400"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={handleConnectWithManualToken}
+                                  disabled={isGoogleSyncLoading}
+                                  className="px-2.5 py-1 text-[9px] font-bold uppercase rounded bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white transition-colors cursor-pointer shrink-0"
+                                >
+                                  Terapkan
+                                </button>
+                              </div>
+                            </div>
                           </div>
                         )}
                       </div>

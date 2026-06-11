@@ -9,8 +9,22 @@ import {
 import firebaseConfig from "../firebase-applet-config.json";
 import { BudgetCategory, RealisasiTransaction } from "./types";
 
+// Load active Firebase config (supports user's custom config for self-hosting integrations like Vercel)
+let activeFirebaseConfig: any = firebaseConfig;
+try {
+  const savedCustomConfig = localStorage.getItem("google_custom_firebase_config");
+  if (savedCustomConfig) {
+    const parsed = JSON.parse(savedCustomConfig);
+    if (parsed && parsed.apiKey && parsed.authDomain) {
+      activeFirebaseConfig = parsed;
+    }
+  }
+} catch (e) {
+  console.error("Gagal memuat custom firebase config dari localStorage:", e);
+}
+
 // Initialize Firebase safely
-const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
+const app = getApps().length === 0 ? initializeApp(activeFirebaseConfig) : getApp();
 export const auth = getAuth(app);
 
 const provider = new GoogleAuthProvider();
@@ -81,7 +95,8 @@ export function getFriendlyAuthErrorMessage(err: any): string {
   const msg = err.message || "";
   
   if (code.includes("unauthorized-domain") || msg.includes("unauthorized-domain")) {
-    return "Domain ini belum diotorisasi oleh Google/Firebase Auth Anda. Harap mendaftarkan domain rincian-3rfu.vercel.app (atau domain Vercel Anda) di Firebase Console Anda > Authentication > Settings > Authorized Domains.";
+    const currentDomain = typeof window !== "undefined" ? window.location.hostname : "domain Anda";
+    return `Domain ini (${currentDomain}) belum diotorisasi oleh Google/Firebase Auth Anda. Harap mendaftarkan domain ${currentDomain} di Firebase Console Anda > Authentication > Settings > Authorized Domains.`;
   }
   if (code.includes("popup-blocked") || msg.includes("popup-blocked")) {
     return "Menu pop-up diblokir oleh browser. Harap izinkan pop-up untuk aplikasi ini dan coba lagi.";

@@ -211,26 +211,9 @@ export default function App() {
           return { ...cat, items: JSON.parse(JSON.stringify(baselineCat.items)) };
         }
 
-        // Structure is same, check if individual names or plans need sync
+        // Structure is same, do not overwrite custom plans/names (to avoid overriding user modifications and infinite loop freezes)
         const verifiedItems = cat.items.map((it) => {
-          const baselineIt = baselineCat.items.find((bi) => bi.id === it.id);
-          if (!baselineIt) return it;
-          let itemCorrected = false;
-          const updatedItem = { ...it };
-
-          if (it.rencana !== baselineIt.rencana) {
-            updatedItem.rencana = baselineIt.rencana;
-            itemCorrected = true;
-          }
-          if (it.nama !== baselineIt.nama) {
-            updatedItem.nama = baselineIt.nama;
-            itemCorrected = true;
-          }
-
-          if (itemCorrected) {
-            corrected = true;
-          }
-          return updatedItem;
+          return it;
         });
 
         return { ...cat, items: verifiedItems };

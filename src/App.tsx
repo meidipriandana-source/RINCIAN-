@@ -610,18 +610,29 @@ export default function App() {
 
   // Automatically check credentials on mount
   useEffect(() => {
-    // Run-once destruction and rebuilding of connection to align with the new official Vercel/Google assets
-    const bridgeResetKey = "apbd_2026_bridge_reset_v3";
-    if (localStorage.getItem(bridgeResetKey) !== "true") {
-      localStorage.removeItem("custom_apbd_spreadsheet_id");
-      localStorage.removeItem("custom_apbd_folder_id");
-      localStorage.removeItem("gdrive_access_token");
-      localStorage.removeItem("gdrive_access_token_expires_at");
-      localStorage.removeItem("apbd_2026_google_linked");
-      localStorage.setItem(bridgeResetKey, "true");
-      // Hard refresh to boot with new default IDs
-      window.location.reload();
-      return;
+    // Run-once destruction and rebuilding of connection safely without reload
+    try {
+      const oldSpreadsheetId = "1-gVQc5jKDzJaBgDCuOvx7khD9NS9839j";
+      const oldFolderId = "1AJcP2TAvDYghh0kb21ZUQ_ou0WeW3B7k";
+      
+      const savedSpreadsheetId = localStorage.getItem("custom_apbd_spreadsheet_id");
+      const savedFolderId = localStorage.getItem("custom_apbd_folder_id");
+
+      if (savedSpreadsheetId === oldSpreadsheetId || savedFolderId === oldFolderId) {
+        localStorage.removeItem("custom_apbd_spreadsheet_id");
+        localStorage.removeItem("custom_apbd_folder_id");
+        localStorage.removeItem("gdrive_access_token");
+        localStorage.removeItem("gdrive_access_token_expires_at");
+        localStorage.removeItem("apbd_2026_google_linked");
+        
+        // Update state in memory immediately
+        setCurrentSpreadsheetId(SPREADSHEET_ID);
+        setCurrentFolderId(FOLDER_ID);
+        setIsCustomWorkspaceActive(false);
+        setIsGoogleLinked(false);
+      }
+    } catch (e) {
+      console.warn("localStorage is sandboxed or inaccessible:", e);
     }
 
     const unsubscribe = initAuth(

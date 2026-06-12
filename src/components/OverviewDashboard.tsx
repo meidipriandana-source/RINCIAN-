@@ -93,68 +93,155 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
   return (
     <div id="dashboard-capture-container" className="space-y-6 md:space-y-8 p-1">
       {/* =========================================================================
-          BARIS 1: HEADER & KPI SCORECARDS (Compact Symmetrical Pillars, p-5)
+          BARIS 1: ENHANCED INTERACTIVE KPI SCORECARDS (Smooth Motion, Glow & Spring Dynamics)
           ========================================================================= */}
       <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         
-        {/* Scorecard 1: Total Anggaran */}
-        <div className={`p-5 rounded-[22px] border relative overflow-hidden shadow-lg flex flex-col justify-between group transition-all duration-300 ${isLight ? 'bg-white border-slate-200' : 'bg-[#1a1b20] border-white/5 shadow-black/40'}`}>
-          <div className="absolute top-4 right-4 text-indigo-500 opacity-20 group-hover:scale-110 transition-transform duration-300">
+        {/* Scorecard 1: Total Pagu */}
+        <motion.div
+          initial={{ opacity: 0, y: 20, scale: 0.97 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          whileHover={{ y: -5, scale: 1.015, boxShadow: "0 20px 25px -5px rgba(99, 102, 241, 0.1), 0 10px 10px -5px rgba(99, 102, 241, 0.04)" }}
+          transition={{ type: "spring", stiffness: 100, damping: 14, delay: 0.05 }}
+          className={`p-5 rounded-[22px] border relative overflow-hidden shadow-lg flex flex-col justify-between group transition-colors duration-300 ${
+            isLight 
+              ? 'bg-white border-slate-200 hover:border-indigo-300' 
+              : 'bg-[#1a1b20] border-white/5 hover:border-indigo-500/30 shadow-black/40'
+          }`}
+        >
+          {/* Subtle Abstract Light Leak/Glow Background */}
+          <div className="absolute -right-10 -bottom-10 w-24 h-24 rounded-full bg-indigo-500/10 blur-xl pointer-events-none group-hover:scale-150 transition-transform duration-500" />
+          
+          <div className="absolute top-4 right-4 text-indigo-500 opacity-20 group-hover:scale-110 group-hover:opacity-40 transition-all duration-300">
             <Wallet size={18} />
           </div>
-          <div className="space-y-0.5 relative z-10">
-            <p className="text-[9px] font-black uppercase tracking-widest text-slate-500">Total Anggaran APBD</p>
-            <h3 className={`text-lg md:text-xl font-black tracking-tight ${themeClasses.textWhite}`}>
+          
+          <div className="space-y-1 relative z-10">
+            <div className="flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse"></span>
+              <p className="text-[9px] font-black uppercase tracking-widest text-slate-500">Total Pagu Anggaran</p>
+            </div>
+            
+            <motion.h3 
+              layoutId="metric-pagu"
+              className={`text-lg md:text-xl font-black font-mono tracking-tight ${themeClasses.textWhite}`}
+            >
               {formatCurrency(totalAnggaran)}
-            </h3>
+            </motion.h3>
           </div>
-          <div className="mt-2.5 flex items-center gap-1.5 text-[10px] text-slate-400 relative z-10">
-            <span className="font-semibold text-indigo-500">100%</span>
-            <span>Alokasi RKA Dikelola</span>
+          
+          <div className="mt-3 flex items-center justify-between border-t border-slate-500/10 pt-2 relative z-10">
+            <div className="flex items-center gap-1 text-[10px] text-slate-400">
+              <span className="font-extrabold text-indigo-500 bg-indigo-500/10 px-1.5 py-0.5 rounded-full text-[8.5px]">RKA</span>
+              <span>Alokasi Pagu Induk</span>
+            </div>
+            <span className="text-[10px] font-mono font-black text-indigo-500">100%</span>
           </div>
-        </div>
-
-        {/* Scorecard 2: Realisasi Anggaran */}
-        <div className={`p-5 rounded-[22px] border relative overflow-hidden shadow-lg flex flex-col justify-between group transition-all duration-300 ${isLight ? 'bg-white border-slate-200' : 'bg-[#1a1b20] border-white/5 shadow-black/40'}`}>
-          <div className="absolute top-4 right-4 text-[#818cf8] opacity-20 group-hover:scale-110 transition-transform duration-300">
+        </motion.div>
+ 
+        {/* Scorecard 2: Realisasi Tahunan (YTD) */}
+        <motion.div
+          initial={{ opacity: 0, y: 20, scale: 0.97 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          whileHover={{ y: -5, scale: 1.015, boxShadow: "0 20px 25px -5px rgba(244, 63, 94, 0.08), 0 10px 10px -5px rgba(244, 63, 94, 0.03)" }}
+          transition={{ type: "spring", stiffness: 100, damping: 14, delay: 0.12 }}
+          className={`p-5 rounded-[22px] border relative overflow-hidden shadow-lg flex flex-col justify-between group transition-colors duration-300 ${
+            isLight 
+              ? 'bg-white border-slate-200 hover:border-rose-300' 
+              : 'bg-[#1a1b20] border-white/5 hover:border-rose-500/20 shadow-black/40'
+          }`}
+        >
+          {/* Subtle Abstract Light Leak/Glow Background */}
+          <div className="absolute -right-10 -bottom-10 w-24 h-24 rounded-full bg-rose-500/5 blur-xl pointer-events-none group-hover:scale-150 transition-transform duration-500" />
+          
+          <div className="absolute top-4 right-4 text-rose-500 opacity-20 group-hover:scale-110 group-hover:opacity-40 transition-all duration-300">
             <CheckCircle2 size={18} />
           </div>
-          <div className="space-y-0.5 relative z-10">
-            <p className="text-[9px] font-black uppercase tracking-widest text-slate-500">Realisasi Anggaran</p>
-            <h3 className="text-lg md:text-xl font-black tracking-tight text-indigo-600 dark:text-[#818cf8]">
+          
+          <div className="space-y-1 relative z-10">
+            <div className="flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse"></span>
+              <p className="text-[9px] font-black uppercase tracking-widest text-slate-500">Realisasi Tahunan (YTD)</p>
+            </div>
+            
+            <motion.h3 
+              layoutId="metric-realisasi"
+              className="text-lg md:text-xl font-black font-mono tracking-tight text-indigo-600 dark:text-[#818cf8]"
+            >
               {formatCurrency(totalRealisasi)}
-            </h3>
+            </motion.h3>
           </div>
-          <div className="mt-2.5 flex items-center gap-1.5 text-[10px] text-slate-400 relative z-10">
-            <span className={`font-semibold ${persentaseRealisasi > 100 ? 'text-rose-500' : 'text-indigo-500'}`}>
-              {persentaseRealisasi.toFixed(2)}%
-            </span>
-            <span>Tingkat Penyerapan/Serap</span>
+          
+          <div className="mt-3 flex items-center justify-between border-t border-slate-500/10 pt-2 relative z-10">
+            <div className="flex items-center gap-1 text-[10px] text-slate-400">
+              <span className={`font-extrabold px-1.5 py-0.5 rounded-full text-[8.5px] ${
+                persentaseRealisasi > 100 ? 'bg-rose-500/15 text-rose-500' : 'bg-emerald-500/15 text-emerald-555'
+              }`}>
+                {persentaseRealisasi.toFixed(1)}%
+              </span>
+              <span>Dana Terpakai / Kas</span>
+            </div>
+            <span className="text-[10px] font-mono font-black text-rose-450 text-indigo-500 dark:text-indigo-400">Real-time</span>
           </div>
-        </div>
-
+        </motion.div>
+ 
         {/* Scorecard 3: Sisa Anggaran */}
-        <div className={`p-5 rounded-[22px] border relative overflow-hidden shadow-lg flex flex-col justify-between group transition-all duration-300 ${isLight ? 'bg-white border-slate-200' : 'bg-[#1a1b20] border-white/5 shadow-black/40'}`}>
-          <div className="absolute top-4 right-4 text-emerald-500 opacity-20 group-hover:scale-110 transition-transform duration-300">
+        <motion.div
+          initial={{ opacity: 0, y: 20, scale: 0.97 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          whileHover={{ y: -5, scale: 1.015, boxShadow: "0 20px 25px -5px rgba(16, 185, 129, 0.08), 0 10px 10px -5px rgba(16, 185, 129, 0.03)" }}
+          transition={{ type: "spring", stiffness: 100, damping: 14, delay: 0.19 }}
+          className={`p-5 rounded-[22px] border relative overflow-hidden shadow-lg flex flex-col justify-between group transition-colors duration-300 ${
+            isLight 
+              ? 'bg-white border-slate-200 hover:border-emerald-300' 
+              : 'bg-[#1a1b20] border-white/5 hover:border-emerald-500/20 shadow-black/40'
+          }`}
+        >
+          {/* Subtle Abstract Light Leak/Glow Background */}
+          <div className="absolute -right-10 -bottom-10 w-24 h-24 rounded-full bg-emerald-500/5 blur-xl pointer-events-none group-hover:scale-150 transition-transform duration-500" />
+          
+          <div className="absolute top-4 right-4 text-emerald-500 opacity-20 group-hover:scale-110 group-hover:opacity-40 transition-all duration-300">
             <TrendingUp size={18} />
           </div>
-          <div className="space-y-0.5 relative z-10">
-            <p className="text-[9px] font-black uppercase tracking-widest text-slate-500">Sisa Anggaran Tersedia</p>
-            <h3 className="text-lg md:text-xl font-black tracking-tight text-emerald-500">
+          
+          <div className="space-y-1 relative z-10">
+            <div className="flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+              <p className="text-[9px] font-black uppercase tracking-widest text-slate-500">Sisa Anggaran Belum Terpakai</p>
+            </div>
+            
+            <motion.h3 
+              layoutId="metric-sisa"
+              className="text-lg md:text-xl font-black font-mono tracking-tight text-emerald-500"
+            >
               {formatCurrency(totalSisa)}
-            </h3>
+            </motion.h3>
           </div>
-          <div className="mt-2.5 flex items-center gap-1.5 text-[10px] text-slate-400 relative z-10">
-            <span className="font-semibold text-emerald-500">
-              {((totalSisa / totalAnggaran) * 100).toFixed(1)}%
-            </span>
-            <span>Headroom Kas Tersisa</span>
+          
+          <div className="mt-3 flex items-center justify-between border-t border-slate-500/10 pt-2 relative z-10">
+            <div className="flex items-center gap-1 text-[10px] text-slate-400">
+              <span className="font-extrabold bg-emerald-500/10 text-emerald-555 px-1.5 py-0.5 rounded-full text-[8.5px]">
+                {((totalSisa / totalAnggaran) * 100).toFixed(1)}%
+              </span>
+              <span>Headroom Sisa RKA</span>
+            </div>
+            <span className="text-[10px] font-mono font-black text-emerald-500">Sisa Pagu</span>
           </div>
-        </div>
-
+        </motion.div>
+ 
         {/* Scorecard 4: Absorpsi Gauge / Mini Donut Chart */}
-        <div className={`p-4 rounded-[22px] border relative overflow-hidden shadow-lg flex items-center gap-3.5 transition-all duration-300 ${isLight ? 'bg-white border-slate-200' : 'bg-[#1a1b20] border-white/5 shadow-black/40'}`}>
-          <div className="relative w-12 h-12 shrink-0 flex items-center justify-center">
+        <motion.div
+          initial={{ opacity: 0, y: 20, scale: 0.97 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          whileHover={{ y: -5, scale: 1.015, boxShadow: "0 20px 25px -5px rgba(99, 102, 241, 0.08)" }}
+          transition={{ type: "spring", stiffness: 100, damping: 14, delay: 0.26 }}
+          className={`p-4 rounded-[22px] border relative overflow-hidden shadow-lg flex items-center gap-3.5 transition-colors duration-300 ${
+            isLight 
+              ? 'bg-white border-slate-200 hover:border-indigo-300' 
+              : 'bg-[#1a1b20] border-white/5 hover:border-indigo-500/20 shadow-black/40'
+          }`}
+        >
+          <div className="relative w-12 h-12 shrink-0 flex items-center justify-center group-hover:scale-105 transition-transform duration-300">
             <svg viewBox="0 0 100 100" className="w-full h-full transform -rotate-90">
               <circle
                 cx="50"
@@ -164,7 +251,7 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
                 stroke={isLight ? "rgba(0, 0, 0, 0.05)" : "rgba(255, 255, 255, 0.03)"}
                 strokeWidth="11"
               />
-              <circle
+              <motion.circle
                 cx="50"
                 cy="50"
                 r="41"
@@ -172,9 +259,10 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
                 stroke={persentaseRealisasi > 100 ? "#f43f5e" : "#6366f1"}
                 strokeWidth="11"
                 strokeDasharray={`${2 * Math.PI * 41}`}
-                strokeDashoffset={`${(2 * Math.PI * 41) - (Math.min(100, persentaseRealisasi) / 100) * (2 * Math.PI * 41)}`}
+                initial={{ strokeDashoffset: `${2 * Math.PI * 41}` }}
+                animate={{ strokeDashoffset: `${(2 * Math.PI * 41) - (Math.min(100, persentaseRealisasi) / 100) * (2 * Math.PI * 41)}` }}
+                transition={{ duration: 1.2, ease: "easeOut", delay: 0.3 }}
                 strokeLinecap="round"
-                className="transition-all duration-1000 ease-out"
               />
             </svg>
             <div className="absolute inset-0 flex items-center justify-center font-mono font-black text-[10px] text-slate-800 dark:text-slate-100">
@@ -182,11 +270,11 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
             </div>
           </div>
           <div className="space-y-0.5 min-w-0">
-            <p className="text-[8px] font-black uppercase tracking-widest text-slate-500">Tingkat Absorpsi</p>
+            <p className="text-[8px] font-black uppercase tracking-widest text-slate-500">Tingkat Penyerapan</p>
             <h4 className={`text-md font-extrabold truncate ${themeClasses.textWhite}`}>{persentaseRealisasi.toFixed(2)}%</h4>
-            <p className="text-[9px] text-slate-400 truncate">Total Penyerapan APBD</p>
+            <p className="text-[9px] text-slate-400 truncate">Total Absorpsi Belanja</p>
           </div>
-        </div>
+        </motion.div>
       </section>
 
       {/* =========================================================================

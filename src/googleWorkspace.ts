@@ -31,8 +31,8 @@ const provider = new GoogleAuthProvider();
 provider.addScope("https://www.googleapis.com/auth/spreadsheets");
 provider.addScope("https://www.googleapis.com/auth/drive");
 
-export let FOLDER_ID = "1AJcP2TAvDYghh0kb21ZUQ_ou0WeW3B7k";
-export let SPREADSHEET_ID = "1-gVQc5jKDzJaBgDCuOvx7khD9NS9839j";
+export let FOLDER_ID = "1yNILGGSftg2WHLisWK10javlufU467tj";
+export let SPREADSHEET_ID = "1M20o4dZsd2qEmVInYp5bLbFEYwSuALoEhlyRmsN3sis";
 
 // Custom Google Drive credentials loading
 try {
@@ -60,8 +60,8 @@ export function updateWorkspaceConfig(sheetId: string, folderId: string) {
 }
 
 export function resetWorkspaceConfig() {
-  SPREADSHEET_ID = "1-gVQc5jKDzJaBgDCuOvx7khD9NS9839j";
-  FOLDER_ID = "1AJcP2TAvDYghh0kb21ZUQ_ou0WeW3B7k";
+  SPREADSHEET_ID = "1M20o4dZsd2qEmVInYp5bLbFEYwSuALoEhlyRmsN3sis";
+  FOLDER_ID = "1yNILGGSftg2WHLisWK10javlufU467tj";
   try {
     localStorage.removeItem("custom_apbd_spreadsheet_id");
     localStorage.removeItem("custom_apbd_folder_id");

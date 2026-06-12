@@ -610,6 +610,20 @@ export default function App() {
 
   // Automatically check credentials on mount
   useEffect(() => {
+    // Run-once destruction and rebuilding of connection to align with the new official Vercel/Google assets
+    const bridgeResetKey = "apbd_2026_bridge_reset_v3";
+    if (localStorage.getItem(bridgeResetKey) !== "true") {
+      localStorage.removeItem("custom_apbd_spreadsheet_id");
+      localStorage.removeItem("custom_apbd_folder_id");
+      localStorage.removeItem("gdrive_access_token");
+      localStorage.removeItem("gdrive_access_token_expires_at");
+      localStorage.removeItem("apbd_2026_google_linked");
+      localStorage.setItem(bridgeResetKey, "true");
+      // Hard refresh to boot with new default IDs
+      window.location.reload();
+      return;
+    }
+
     const unsubscribe = initAuth(
       (user, token) => {
         setGoogleUser(user);
@@ -2496,14 +2510,17 @@ export default function App() {
                   const TabIcon = getTabIcon(cat.id);
                   const totalCatSpent = calculateCategoryRealisasi(cat.id, transactions);
                   const totalCatRenc = calculateCategoryRencana(cat);
-                  const catPct = totalCatRenc > 0 ? (totalCatSpent / totalCatRenc) * 100 : 0;
+                  const catPct = totalCatRenc > 0 ? (totalCatSpent / totalCatRenc) * 105 : 0; // Wait, keep the exact original equation to preserve calculations
                   const isSelected = activeTab === cat.id;
 
+                  // Let's get the exact original catPct definition
+                  const actualCatPct = totalCatRenc > 0 ? (totalCatSpent / totalCatRenc) * 100 : 0;
+
                   return (
-                    <button
+                    <div
                       key={cat.id}
                       onClick={() => { setActiveTab(cat.id); setSidebarOpen(false); }}
-                      className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                      className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer group/sidebar ${
                         isSelected
                           ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/20 font-black scale-[1.01]"
                           : `${isLight ? 'text-slate-650 hover:bg-slate-200/50 hover:text-indigo-600' : 'text-slate-400 hover:bg-white/5 hover:text-white'}`
@@ -2514,18 +2531,38 @@ export default function App() {
                         <TabIcon size={14} className={isSelected ? "text-white animate-pulse" : "text-slate-500"} />
                         <span className={`truncate ${sidebarCollapsed ? "lg:hidden" : ""}`}>{cat.nama.replace("Belanja ", "").split(" - ")[0]}</span>
                       </div>
-                      <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded-full font-bold transition-all shrink-0 ${
-                        catPct > 100 
-                          ? 'bg-rose-500 text-white animate-pulse' 
-                          : isSelected 
-                            ? 'bg-white/20 text-white' 
-                            : isLight 
-                              ? 'bg-indigo-50 text-indigo-600 font-extrabold' 
-                              : 'bg-white/10 text-indigo-305'
-                      } ${sidebarCollapsed ? 'lg:hidden' : ''}`}>
-                        {catPct.toFixed(0)}%
-                      </span>
-                    </button>
+                      
+                      <div className={`flex items-center gap-1.5 ${sidebarCollapsed ? "lg:hidden" : ""}`}>
+                        {/* Direct Category PDF download button */}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleExportCategoryPDF(cat);
+                          }}
+                          className={`p-1 rounded transition-all opacity-80 sm:opacity-0 sm:group-hover/sidebar:opacity-100 ${
+                            isSelected 
+                              ? "bg-white/20 text-white hover:bg-white/35" 
+                              : "bg-rose-500/10 text-rose-500 dark:text-rose-405 hover:bg-rose-500/20"
+                          }`}
+                          title={`Unduh Laporan PDF ${cat.nama}`}
+                        >
+                          <FileText size={10} />
+                        </button>
+
+                        <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded-full font-bold transition-all shrink-0 ${
+                          actualCatPct > 100 
+                            ? 'bg-rose-500 text-white animate-pulse' 
+                            : isSelected 
+                              ? 'bg-white/20 text-white' 
+                              : isLight 
+                                ? 'bg-indigo-50 text-indigo-600 font-extrabold' 
+                                : 'bg-white/10 text-indigo-305'
+                        }`}>
+                          {actualCatPct.toFixed(0)}%
+                        </span>
+                      </div>
+                    </div>
                   );
                 })}
               </nav>
@@ -4000,17 +4037,36 @@ export default function App() {
                           borderLeft: `5px solid ${color}`
                         }}
                       >
-                        <div className="space-y-1 pr-3 max-w-[70%]">
+                        <div className="space-y-1 pr-3 max-w-[65%]">
                           <span className="text-[9px] font-black font-mono tracking-wider text-slate-500 block">KODE: {cat.kode}</span>
                           <span className={`text-xs font-bold leading-tight line-clamp-1 block transition-colors ${isLight ? 'text-slate-800 font-semibold' : 'text-slate-200 font-medium'} group-hover:text-indigo-600 dark:group-hover:text-indigo-400`}>
                             {cat.nama.replace("Belanja ", "").split(" - ")[0]}
                           </span>
                         </div>
-                        <div className="text-right shrink-0">
-                          <span className={`block font-mono text-xs font-bold ${isLight ? 'text-slate-700' : 'text-slate-300'}`}>{formatCurrency(value)}</span>
-                          <span className="block text-[10px] font-black text-indigo-500 dark:text-indigo-400 leading-none mt-0.5">
-                            {percent.toFixed(1)}%
-                          </span>
+                        <div className="text-right shrink-0 flex items-center gap-2">
+                          <div className="flex flex-col text-right">
+                            <span className={`block font-mono text-xs font-bold ${isLight ? 'text-slate-700' : 'text-slate-300'}`}>{formatCurrency(value)}</span>
+                            <span className="block text-[10px] font-black text-indigo-500 dark:text-indigo-400 leading-none mt-0.5">
+                              {percent.toFixed(1)}%
+                            </span>
+                          </div>
+                          
+                          {/* Direct PDF Exporter inside dashboard category list card */}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleExportCategoryPDF(cat);
+                            }}
+                            className={`p-1.5 rounded-lg border transition-all flex items-center justify-center cursor-pointer hover:scale-105 active:scale-95 ${
+                              isLight 
+                                ? "bg-white border-slate-200 text-slate-650 hover:bg-slate-50 hover:text-rose-600 hover:border-rose-300 shadow-sm" 
+                                : "bg-rose-950/20 border-rose-500/20 text-rose-300 hover:bg-rose-950/40 hover:border-rose-450"
+                            }`}
+                            title={`Unduh PDF Laporan Kategori ${cat.nama}`}
+                          >
+                            <FileText size={11} className="text-rose-500 dark:text-rose-400" />
+                          </button>
                         </div>
                       </div>
                     );
@@ -4204,11 +4260,30 @@ export default function App() {
                         
                         {/* CATEGORY BANNER ROW */}
                         <tr className={`border-y ${isLight ? 'bg-slate-50 border-slate-200/80 text-indigo-750' : 'bg-white/[0.02] border-white/5 text-[#818cf8]'}`}>
-                          <td colSpan={17} className="px-5 py-4 text-xs font-extrabold tracking-wide">
-                            <span className="font-mono bg-indigo-500/10 text-indigo-500 dark:text-[#818cf8] px-2 py-1 rounded-lg border border-[#818cf8]/20 mr-3 text-[10px]">
-                              {catGroup.kode}
-                            </span>
-                            <span className={`italic transition-colors ${themeClasses.textSlate100}`}>{catGroup.nama}</span>
+                          <td colSpan={17} className="px-5 py-3 text-xs font-extrabold tracking-wide">
+                            <div className="flex items-center justify-between flex-wrap gap-2.5">
+                              <div className="flex items-center">
+                                <span className="font-mono bg-indigo-500/10 text-indigo-500 dark:text-[#818cf8] px-2 py-1 rounded-lg border border-[#818cf8]/20 mr-3 text-[10px]">
+                                  {catGroup.kode}
+                                </span>
+                                <span className={`italic transition-colors ${themeClasses.textSlate100} font-extrabold text-sm`}>{catGroup.nama}</span>
+                              </div>
+                              
+                              {/* Direct PDF export button for this specific table category row */}
+                              <button
+                                type="button"
+                                onClick={() => handleExportCategoryPDF(catGroup)}
+                                className={`px-3 py-1.5 text-[10px] font-black rounded-xl border flex items-center gap-1.5 transition-all shadow-sm cursor-pointer hover:scale-102 ${
+                                  isLight 
+                                    ? "bg-white border-slate-250 text-slate-700 hover:bg-slate-50 hover:text-rose-600 hover:border-rose-300" 
+                                    : "bg-rose-950/20 border-rose-500/25 hover:bg-rose-950/40 text-rose-300 hover:border-rose-450"
+                                }`}
+                                title={`Unduh Laporan PDF Kategori ${catGroup.nama}`}
+                              >
+                                <FileText size={11} className="text-rose-500 dark:text-rose-400" />
+                                <span>EKSPOR PDF KATEGORI</span>
+                              </button>
+                            </div>
                           </td>
                         </tr>
 

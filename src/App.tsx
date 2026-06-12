@@ -356,7 +356,16 @@ export default function App() {
 
   const showToast = (text: string, type: "success" | "info" | "warn" = "success") => {
     setToastMessage({ text, type });
-    setTimeout(() => setToastMessage(null), 4000);
+    
+    // Clear existing timer if any to prevent race-conditions
+    if ((window as any)._toastTimeoutId) {
+      clearTimeout((window as any)._toastTimeoutId);
+    }
+    
+    const timeoutDuration = type === "warn" ? 25050 : 6000; // Give 25 seconds for warning boxes so users can read the console/GCP links carefully
+    (window as any)._toastTimeoutId = setTimeout(() => {
+      setToastMessage(null);
+    }, timeoutDuration);
   };
 
   // --- GOOGLE WORKSPACE API SCRIPTING HANDLERS ---
@@ -2404,18 +2413,46 @@ export default function App() {
       {/* --- SYSTEM NOTIFICATION TOAST --- */}
       {toastMessage && (
         <div 
-          className={`fixed top-6 right-6 z-[999] flex items-center gap-3 px-5 py-4 rounded-2xl border shadow-2xl transition-all duration-300 animate-in slide-in-from-top-4 ${
+          className={`fixed top-6 right-6 z-[999] flex items-start gap-3.5 px-5 py-4 rounded-2xl border shadow-2xl transition-all duration-300 animate-in slide-in-from-top-4 max-w-md ${
             toastMessage.type === "success" 
-              ? "bg-emerald-950/85 border-emerald-500/30 text-emerald-300 backdrop-blur-md"
+              ? "bg-emerald-950/90 border-emerald-500/30 text-emerald-300 backdrop-blur-md"
               : toastMessage.type === "warn"
-              ? "bg-rose-950/85 border-rose-500/30 text-rose-300 backdrop-blur-md"
-              : "bg-slate-900/90 border-indigo-500/30 text-indigo-300 backdrop-blur-md"
+              ? "bg-rose-950/95 border-rose-500/30 text-rose-200 backdrop-blur-md shadow-rose-950/50"
+              : "bg-slate-900/95 border-indigo-500/30 text-indigo-300 backdrop-blur-md"
           }`}
         >
-          {toastMessage.type === "success" && <CheckCircle2 size={18} className="text-emerald-400 shrink-0" />}
-          {toastMessage.type === "warn" && <AlertTriangle size={18} className="text-rose-400 shrink-0" />}
-          {toastMessage.type === "info" && <CircleAlert size={18} className="text-indigo-400 shrink-0" />}
-          <span className="text-sm font-medium tracking-wide">{toastMessage.text}</span>
+          {toastMessage.type === "success" && <CheckCircle2 size={18} className="text-emerald-400 shrink-0 mt-0.5" />}
+          {toastMessage.type === "warn" && <AlertTriangle size={18} className="text-rose-450 shrink-0 mt-0.5" />}
+          {toastMessage.type === "info" && <CircleAlert size={18} className="text-indigo-400 shrink-0 mt-0.5" />}
+          <div className="flex-1 flex flex-col gap-1 text-[11.5px] font-medium leading-relaxed tracking-wide select-text whitespace-pre-line">
+            {(() => {
+              const urlRegex = /(https?:\/\/[^\s]+)/g;
+              const parts = toastMessage.text.split(urlRegex);
+              return parts.map((part, i) => {
+                if (part.match(urlRegex)) {
+                  return (
+                    <a
+                      key={i}
+                      href={part}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-amber-400 hover:text-amber-300 underline font-extrabold break-all inline-block hover:scale-[1.01] transition-transform"
+                    >
+                      {part}
+                    </a>
+                  );
+                }
+                return <span key={i}>{part}</span>;
+              });
+            })()}
+          </div>
+          <button 
+            type="button"
+            onClick={() => setToastMessage(null)}
+            className="ml-1 text-[9px] uppercase font-black tracking-wider px-1.5 py-1 rounded bg-black/20 hover:bg-black/40 text-slate-400 hover:text-white transition-colors cursor-pointer select-none"
+          >
+            Tutup
+          </button>
         </div>
       )}
 
@@ -4698,13 +4735,7 @@ export default function App() {
                               setIsGoogleSyncLoading(false);
                             }
                           } else {
-                            const reader = new FileReader();
-                            reader.onload = () => {
-                              setFormPdfUrl(reader.result as string);
-                              setFormPdfName(file.name);
-                              showToast("Dokumen PDF tersimpan sementara di memori lokal!");
-                            };
-                            reader.readAsDataURL(file);
+                            showToast("Penyimpanan PDF di lokal dinonaktifkan! Hubungkan ke Google Drive terlebih dahulu di panel samping kiri.", "warn");
                           }
                         }
                       }}
@@ -5417,13 +5448,7 @@ export default function App() {
                               setIsGoogleSyncLoading(false);
                             }
                           } else {
-                            const reader = new FileReader();
-                            reader.onload = () => {
-                              setEditPdfUrl(reader.result as string);
-                              setEditPdfName(file.name);
-                              showToast("Dokumen PDF tersimpan sementara di memori lokal!");
-                            };
-                            reader.readAsDataURL(file);
+                            showToast("Penyimpanan PDF di lokal dinonaktifkan! Hubungkan ke Google Drive terlebih dahulu di panel samping kiri.", "warn");
                           }
                         }
                       }}

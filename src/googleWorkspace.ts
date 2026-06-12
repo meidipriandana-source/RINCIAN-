@@ -310,17 +310,52 @@ export async function uploadPdfToDrive(file: File): Promise<{ webViewLink: strin
 
   // Try uploading to specific folder first
   let response = await performUpload([FOLDER_ID]);
+  let firstErrText = "";
 
   if (!response.ok) {
-    console.warn(`Gagal mengunggah file ke folder spesifik (${FOLDER_ID}). Mencoba mengunggah ke root Google Drive...`);
+    try {
+      firstErrText = await response.text();
+    } catch (_) {
+      firstErrText = "";
+    }
+    console.warn(`Gagal mengunggah file ke folder spesifik (${FOLDER_ID}). Error: ${firstErrText || response.statusText}. Mencoba mengunggah ke root Google Drive...`);
     // Retry without parent folder (defaults to Root of their Drive)
     response = await performUpload();
   }
 
   if (!response.ok) {
-    const errText = await response.text();
-    console.error("Gagal mengunggah file ke Google Drive (Root & Folder):", errText);
-    throw new Error(`Upload gagal: ${response.statusText}`);
+    let secondErrText = "";
+    try {
+      secondErrText = await response.text();
+    } catch (_) {
+      secondErrText = "";
+    }
+    const finalErrText = secondErrText || firstErrText;
+    console.error("Gagal mengunggah file ke Google Drive (Root & Folder):", finalErrText);
+
+    let friendlyMessage = `Upload gagal: ${response.statusText}`;
+    try {
+      if (finalErrText) {
+        const errJson = JSON.parse(finalErrText);
+        if (errJson?.error?.message) {
+          const msg = errJson.error.message;
+          if (msg.includes("Google Drive API has not been used") || msg.includes("disabled") || msg.includes("accessNotConfigured")) {
+            // Find container / project ID
+            let projNum = "1029022374923";
+            const matchProj = msg.match(/project (\d+)/) || finalErrText.match(/projects\/(\d+)/) || finalErrText.match(/project=(\d+)/);
+            if (matchProj) {
+              projNum = matchProj[1];
+            }
+            friendlyMessage = `Google Drive API dinonaktifkan di Google Cloud Project kustom Anda nomor ${projNum}.\n\nLangkah Solusi:\n1. Klik atau buka link Google Console berikut:\nhttps://console.developers.google.com/apis/api/drive.googleapis.com/overview?project=${projNum}\n2. Klik tombol "Aktifkan" atau "Enable".\n3. Tunggu 1-2 menit agar perubahan diterapkan, lalu coba rekam realisasi dan unggah berkas PDF kembali!`;
+          } else {
+            friendlyMessage = `Gagal mengupload ke Google Drive: ${msg}`;
+          }
+        }
+      }
+    } catch (e) {
+      // JSON parse failed, keep generic statusText
+    }
+    throw new Error(friendlyMessage);
   }
 
   const result = await response.json();

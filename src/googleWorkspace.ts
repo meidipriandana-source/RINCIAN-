@@ -278,21 +278,32 @@ export async function uploadPdfToDrive(file: File): Promise<{ webViewLink: strin
       metadata.parents = parents;
     }
 
-    const formData = new FormData();
-    formData.append(
-      "metadata",
-      new Blob([JSON.stringify(metadata)], { type: "application/json" })
-    );
-    formData.append("file", file);
+    const fileContent = await file.arrayBuffer();
+    const boundary = "314159265358979323846";
+    const delimiter = `\r\n--${boundary}\r\n`;
+    const closeDelim = `\r\n--${boundary}--`;
+
+    const metadataPart = `Content-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(metadata)}`;
+    const mediaPart = `Content-Type: ${file.type || "application/pdf"}\r\n\r\n`;
+
+    const bodyBlob = new Blob([
+      delimiter,
+      metadataPart,
+      delimiter,
+      mediaPart,
+      new Uint8Array(fileContent),
+      closeDelim
+    ]);
 
     return fetch(
       `https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink`,
       {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${token}`
+          Authorization: `Bearer ${token}`,
+          "Content-Type": `multipart/related; boundary=${boundary}`
         },
-        body: formData
+        body: bodyBlob
       }
     );
   };
